@@ -55,8 +55,10 @@ class Likelihood(object):
         self._likelihood_function = func
 
 
-    def likelihood(self, data, **kwargs):
-        """ Call the likelihood function on the supplied data
+    def likelihood(self, dataset, **kwargs):
+        """ Call the likelihood function on the supplied dataset
+
+        Dataset should be a list of data points
 
         Use the callable function that was previously set, 
         and use the current 'state' of the class for the
@@ -82,8 +84,11 @@ class Likelihood(object):
             val = getattr(self, arg)
             kw_args[arg] = val
 
-        likelihood_val = self._likelihood_function(data, **kw_args)
-
+        likelihood_val = 1.0
+        for point in dataset:
+            likelihood_val *= self._likelihood_function(point, **kw_args)
+        #likelihood_val = self._likelihood_function(data, **kw_args)
+        
         if likelihood_val < 0:
             print "Error: Likelihood evaluated to < 0: ", likelihood_val
             raise Exception("LikelihoodEval")
@@ -97,7 +102,7 @@ class Likelihood(object):
         return likelihood_val
 
 
-    def nll(self, data, **kwargs):
+    def nll(self, dataset, **kwargs):
         """ Return the negative log likelihood 
 
         Evaluate on the supplied data and return the value
@@ -106,8 +111,9 @@ class Likelihood(object):
 
         """
 
+        '''
         val = 0.0
-        for point in data:
+        for point in dataset:
             likelihood_val = self.likelihood(point, **kwargs)
             if likelihood_val == 0.0:
                 print "Error: Likelihood evaluates to 0.0"
@@ -118,9 +124,21 @@ class Likelihood(object):
                 print "Encountered Val Error.  Input to log: ", likelihood_val
                 raise Exception("NegativeLogLikelihoodEval")
         return val
+        '''
+
+        likelihood_val = self.likelihood(dataset, **kwargs)
+        if likelihood_val == 0.0:
+            print "Error: Likelihood evaluates to 0.0"
+            raise Exception("LikelihoodEval")
+        try:
+            neg_log_val = -1*math.log(likelihood_val)
+        except ValueError:
+            print "Encountered Val Error.  Input to log: ", likelihood_val
+            raise Exception("NegativeLogLikelihoodEval")
+        return neg_log_val
 
 
-    def minimize(self, data, params, **kwargs):
+    def minimize(self, dataset, params, **kwargs):
         """ Minmize the supplied parameters based on the nll
 
         Set the values of the minimized parameters in the
@@ -136,8 +154,8 @@ class Likelihood(object):
 
         """
 
-        print "Minimizing the following parameters:"
-        params
+        # Should parse the kwargs for any recognized arguments
+        # and set the state based on them
 
         # Create the function for minimization
         def nnl_for_min(param_values):
@@ -148,14 +166,14 @@ class Likelihood(object):
             for (nuis, val) in zip(params, param_values):
                 setattr(self, nuis, val)
             self.print_state()
-            return self.nll(data, **kwargs)
+            return self.nll(dataset)
 
         # Get the initial guess
         guess = [getattr(self, param) for param in params]
         print "Minimizing: ", zip(params, guess)
 
         # Run the minimization
-        res = scipy.optimize.minimize(nnl_for_min, guess)
+        res = scipy.optimize.minimize(nnl_for_min, guess, **kwargs)
         print "Successfully Minimized:", res
         #bounds = [self.bounds[param] for param in params]
         #print "Minimizing: ", zip(params, guess, bounds)
@@ -170,7 +188,7 @@ class Likelihood(object):
         return min
 
 
-    def profile(self, data, poi, nuisance, **kwargs):
+    def profile(self, dataset, poi, nuisance, **kwargs):
         """ Return the profile likelihood as a function of the poi
         (parameter of interest), minimizing over the nuisance parameters
 
@@ -187,12 +205,12 @@ class Likelihood(object):
         all_params = [poi]
         all_params.extend(nuisance)
         print "All Params: ", all_params
-        global_min = self.minimize(data, params=all_params, **kwargs)
-        global_nll = self.nll(data)
+        global_min = self.minimize(dataset, params=all_params, **kwargs)
+        global_nll = self.nll(dataset)
 
         # Get the local min at this point
         setattr(self, poi, current_poi_value)
-        local_min = self.minimize(data, params=nuisance, **kwargs)
-        local_nll = self.nll(data)
+        local_min = self.minimize(dataset, params=nuisance, **kwargs)
+        local_nll = self.nll(dataset)
 
         return local_nll - global_nll

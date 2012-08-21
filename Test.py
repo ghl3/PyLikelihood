@@ -1,5 +1,7 @@
 #!/usr/bin/env python
 
+import math
+
 from Likelihood import *
 
 import matplotlib.pyplot as plt
@@ -36,15 +38,31 @@ def simple_likelihood(d, n, mu, alpha_1, delta_1, alpha_2, delta_2):
     return val
 
 
+def my_func(x, mu, sigma):
+    return gauss(x, mu, sigma)
+
+
 def main():
 
+    model = Likelihood(my_func)
+    model.mu=0.0
+    model.sigma=1.0
+    model.print_state()
+    #model.bracket['sigma'] = (0, None)    
+    dataset = [2]
+
+    print model.likelihood(dataset)
+    model.minimize(dataset, params=['mu'])
+
     # Test the pois
+    '''
     x = np.arange(-5, 5, .1)
     y = [gauss(point, 0, 1) for point in x]
     plt.figure()
     plt.plot(x, y)
     plt.savefig("gauss.pdf")
-    
+    '''
+
     # Create a likelihood model
     #model = Likelihood()
     #model.SetLikelihood(simple_likelihood)
@@ -61,7 +79,6 @@ def main():
 
     pll = model.profile(data, "mu", nuisance=['alpha_1', 'alpha_2'])
     print "Profile Likelihood: ", pll
-    return
 
     print model.likelihood(data)
     model.print_state()
