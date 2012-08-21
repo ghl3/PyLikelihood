@@ -38,21 +38,21 @@ def simple_likelihood(d, n, mu, alpha_1, delta_1, alpha_2, delta_2):
     return val
 
 
-def my_func(x, mu, sigma):
-    return gauss(x, mu, sigma)
+def my_func(x, y):
+    return math.exp(-1*(x-y)*(x-y))
+    #return gauss(x, mu, sigma)
 
 
 def main():
 
     model = Likelihood(my_func)
-    model.mu=0.0
-    model.sigma=1.0
+    model.y=0.0
     model.print_state()
     #model.bracket['sigma'] = (0, None)    
     dataset = [2]
 
     print model.likelihood(dataset)
-    model.minimize(dataset, params=['mu'])
+    model.minimize(dataset, params=['y'])
 
     # Test the pois
     '''
