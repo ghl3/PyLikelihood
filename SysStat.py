@@ -21,7 +21,6 @@ def gauss(x, mu, sigma):
     rv = norm(loc=mu, scale=sigma)
     return rv.pdf([x])
 
-
 class nll(object):
     def __init__(self):
         self.n=None
@@ -37,7 +36,7 @@ class nll(object):
         # Set the values of any given args
         for (member, val) in kwargs.iteritems():
             setattr(self, member, val)
-
+        
         n_hat = self.n*self.mu*(1.0 + self.alpha*self.delta)
         return pois(self.n, n_hat)*gauss(self.alpha, 0.0, 1.0)
         
@@ -48,15 +47,63 @@ class nll(object):
         return val
 
 
+    def minimize(self, dataset, params=[]):
+
+        # Create the function for minimization
+        def nnl_for_min(param_values):
+            """ Minimize the likelihood over all supplied params
+
+            """
+            
+            # Set the value of the var and the nuisance
+            for (nuis, val) in zip(params, param_values):
+                setattr(self, nuis, val)
+
+            return self.eval(dataset)
+
+        # Get the global minimum
+        guess = [getattr(self, param) for param in params]
+        print "Guess: ", guess
+        res = scipy.optimize.minimize(nnl_for_min, guess)
+        
+        # Set the values to the minimum
+        min_values = res.x
+        
+        print "Successfully Minimized:", res
+        for (param, val) in zip(params, min_values):
+            print param, val
+            setattr(self, param, val)
+
+        return min
+        
+        
+'''
+    def profile(self, dataset, var, nuisance=[]):
+        """ Return the profile likelihood of 'var',
+        minimizing over all parameters in 'profile'
+        """
+'''
+
+
+
 def main():
 
     my_nll = nll()
     my_nll.n = 100
+    my_nll.mu = 1.0
     my_nll.alpha = 0
     my_nll.delta = 2
 
     data = [110]
-    
+   
+    # Test the minimization
+    my_nll.minimize(data, params=['alpha', 'mu'])
+
+    return
+
+                    
+ 
+                    
     # Plot the likelihood as a function of mu
     x = scipy.linspace(0,2,num=100)
     y = [my_nll.eval(data, mu=p) for p in x]
