@@ -7,23 +7,17 @@ from pprint import pprint
 
 import scipy.optimize
 #from scipy import stats
-from scipy.stats import poisson
-from scipy.stats import norm
 
-import numpy as np
+#import numpy as np
 
-def pois(x, l):
-    rv = poisson([l])
-    return rv.pmf(x)[0]
-
-def gauss(x, mu, sigma):
-    rv = norm(loc=mu, scale=sigma)
-    return rv.pdf([x])[0]
 
 class Likelihood(object):
-    def __init__(self):
+    def __init__(self, func=None):
         self._arg_list=[]
         self._likelihood_function=None
+        if func == None:
+            return
+        self.SetLikelihood(func)
 
     def print_state(self):
         pprint(vars(self))

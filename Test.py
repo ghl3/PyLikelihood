@@ -3,8 +3,19 @@
 from Likelihood import *
 
 import matplotlib.pyplot as plt
-#import pylab
+import numpy as np
 
+from scipy.stats import poisson
+from scipy.stats import norm
+
+
+def pois(x, l):
+    rv = poisson([l])
+    return rv.pmf(x)[0]
+
+def gauss(x, mu, sigma):
+    rv = norm(loc=mu, scale=sigma)
+    return rv.pdf([x])[0]
 
 def simple_likelihood(d, n, mu, alpha, delta):
     """ The probability of a single data point given parametres
@@ -27,8 +38,9 @@ def main():
     plt.savefig("gauss.pdf")
     
     # Create a likelihood model
-    model = Likelihood()
-    model.SetLikelihood(simple_likelihood)
+    #model = Likelihood()
+    #model.SetLikelihood(simple_likelihood)
+    model = Likelihood(simple_likelihood)
 
     model.n = 100
     model.mu = 1.0
@@ -57,7 +69,6 @@ def main():
     #plt.axis([0, 3, 0, 20])
     plt.savefig("nll.pdf")    
     return
-
 
 
     #x = scipy.linspace(0,10,11)
