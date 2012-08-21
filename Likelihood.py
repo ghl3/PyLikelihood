@@ -21,7 +21,7 @@ def gauss(x, mu, sigma):
     rv = norm(loc=mu, scale=sigma)
     return rv.pdf([x])
 
-class nll(object):
+class Likelihood(object):
     def __init__(self):
         self.n=None
         self.mu=None
@@ -40,7 +40,7 @@ class nll(object):
         n_hat = self.n*self.mu*(1.0 + self.alpha*self.delta)
         return pois(self.n, n_hat)*gauss(self.alpha, 0.0, 1.0)
         
-    def eval(self, dataset, **kwargs):
+    def nll(self, dataset, **kwargs):
         val = 0.0
         for point in dataset:
             val += -1* math.log(self._likelihood(point, **kwargs))
@@ -59,7 +59,7 @@ class nll(object):
             for (nuis, val) in zip(params, param_values):
                 setattr(self, nuis, val)
 
-            return self.eval(dataset)
+            return self.nll(dataset)
 
         # Get the global minimum
         guess = [getattr(self, param) for param in params]
@@ -88,26 +88,23 @@ class nll(object):
 
 def main():
 
-    my_nll = nll()
-    my_nll.n = 100
-    my_nll.mu = 1.0
-    my_nll.alpha = 0
-    my_nll.delta = 2
+    model = Likelihood()
+    model.n = 100
+    model.mu = 1.0
+    model.alpha = 0
+    model.delta = 2
 
     data = [110]
    
     # Test the minimization
-    my_nll.minimize(data, params=['alpha', 'mu'])
+    #model.minimize(data, params=['alpha', 'mu'])
 
-    return
-
-                    
- 
                     
     # Plot the likelihood as a function of mu
     x = scipy.linspace(0,2,num=100)
-    y = [my_nll.eval(data, mu=p) for p in x]
+    y = [model.nll(data, mu=p) for p in x]
     pylab.plot(x, y)
+
     plt.savefig("bob.pdf")    
     return
 
