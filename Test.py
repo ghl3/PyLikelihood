@@ -11,7 +11,10 @@ def simple_likelihood(d, n, mu, alpha, delta):
     
     """
     n_hat = n*mu*(1.0 + alpha*delta)
-    return pois(d, n_hat)*gauss(0.0, alpha, 1.0)
+    val = pois(d, n_hat)*gauss(0.0, alpha, 1.0)
+    if math.isnan(val):
+        return .0000000001
+    return val
 
 
 def main():
@@ -35,9 +38,9 @@ def main():
     data = [110]
 
     print model
-    print model._likelihood(data)
+    print model.likelihood(data)
     model.print_state()
-    print model._likelihood(data, alpha=1)
+    print model.likelihood(data, alpha=1)
     model.print_state()
 
     # Test the minimization
