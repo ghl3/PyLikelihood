@@ -6,10 +6,6 @@ import inspect
 from pprint import pprint
 
 import scipy.optimize
-#from scipy import stats
-
-#import numpy as np
-
 
 class Likelihood(object):
     def __init__(self, func=None):
@@ -123,6 +119,12 @@ class Likelihood(object):
         likelihood's 'state'.  Use any keyword arguments as
         initial values to parameters, or for any other
         (non-minimized) parameters in the model
+
+        TO DO: Split the kwargs into args for the nll
+        and args for optimize.minimize, and throw
+        exceptions for all others
+        (Should also warn about argument clashes with
+        optimize when the likelihood function is initialized...)
 
         """
 
