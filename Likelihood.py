@@ -15,9 +15,6 @@ class Likelihood(object):
             return
         self.SetLikelihood(func)
 
-    def print_state(self):
-        pprint(vars(self))
-
     def SetLikelihood(self, func, **kwargs):
         """ Set the likelihood function to be 'func'
 
@@ -80,7 +77,13 @@ class Likelihood(object):
         return unused_args
 
 
-    def eval(self, data, **kwargs):
+    def get_state(self):
+        state = {}
+        for arg in self._arg_list:
+            state[arg] = getattr(self, arg)
+        return state
+        
+    def eval(self, data_point, **kwargs):
         """ Evaluate the callable function on a single dataset
         
         """
@@ -90,7 +93,7 @@ class Likelihood(object):
 
         # Get the value
         func_args = self.get_function_args()
-        likelihood_val = self._likelihood_function(point, **func_args)
+        likelihood_val = self._likelihood_function(data_point, **func_args)
 
         self.check_value(likelihood_val)
 
@@ -176,7 +179,7 @@ class Likelihood(object):
 
             for (nuis, val) in zip(params, param_values):
                 setattr(self, nuis, val)
-            self.print_state()
+            print self.get_state()
             return self.nll(dataset)
 
         # Get the initial guess
