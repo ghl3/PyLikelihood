@@ -2,15 +2,15 @@
 import sys
 import math
 
+import inspect
+from pprint import pprint
+
 import scipy.optimize
 #from scipy import stats
 from scipy.stats import poisson
 from scipy.stats import norm
 
 import numpy as np
-
-from pprint import pprint
-
 
 def pois(x, l):
     rv = poisson([l])
@@ -35,17 +35,6 @@ class Likelihood(object):
         
     def print_state(self):
         pprint(vars(self))
-
-    def _likelihood(self, d, **kwargs):
-        """ The probability of a single data point given parametres
-
-        """
-        # Set the values of any given args
-        for (member, val) in kwargs.iteritems():
-            setattr(self, member, val)
-        
-        n_hat = self.n*self.mu*(1.0 + self.alpha*self.delta)
-        return pois(d, n_hat)*gauss(0.0, self.alpha, 1.0)
 
         
     def nll(self, dataset, **kwargs):
@@ -93,7 +82,59 @@ class Likelihood(object):
             setattr(self, param, val)
 
         return min
+
+    #
+    # Experimental Methods
+    #
+
+
+    def SetLikelihood(self, func):
+        """ Set the likelihood function
         
+        This instance of the class will get members for
+        every parameter of the function, and future calls
+        to the likelihood will use the current values
+        stored in this instance
+
+        The first argument is interpreted as a list
+        that represents the data
+
+        """
+        
+        # Get the parameters of the function
+        func_spec = inspect.getargspec(func)
+        arg_list = func_spec.args[1:]
+        for arg in arg_list:
+            setattr(self, arg, None)
+
+        self._arg_list = arg_list
+        self._likelihood_function = func
+
+
+    def CallLikelihood(self, data, **kwargs):
+        """ Call the likelihood function with the
+        current state of the class
+
+        """
+
+        # Take any keyword arguments to CallLikelihood
+        # and set the current value of the class before
+        # actually calling the likelihood
+        for (arg, val) in kwargs.iteritems():
+            if arg in self._arg_list:
+                setattr(self, arg, val)
+            else:
+                print "Error: %s is not a parameter of the likelihood" % arg
+                raise Exception("Bad Likelihood Parameter")
+
+        # Create the argumets
+        kw_args = {}
+        for arg in self._arg_list:
+            val = getattr(self, arg)
+            kw_args[arg] = val
+        return self._likelihood_function(data, **kw_args)
+
+
         
 '''
     def profile(self, dataset, var, nuisance=[]):

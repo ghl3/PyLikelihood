@@ -5,6 +5,15 @@ from Likelihood import *
 import matplotlib.pyplot as plt
 #import pylab
 
+
+def simple_likelihood(d, n, mu, alpha, delta):
+    """ The probability of a single data point given parametres
+    
+    """
+    n_hat = n*mu*(1.0 + alpha*delta)
+    return pois(d, n_hat)*gauss(0.0, alpha, 1.0)
+
+
 def main():
 
     # Test the pois
@@ -16,15 +25,26 @@ def main():
     
     # Create a likelihood model
     model = Likelihood()
+    model.SetLikelihood(simple_likelihood)
+
+
     model.n = 100
     model.mu = 1.0
     model.alpha = 0
     model.delta = 20
 
     data = [110]
-   
+
+    print model
+    print model.CallLikelihood(data)
+    model.print_state()
+    print model.CallLikelihood(data, alpha=1)
+    model.print_state()
+    return
+
     # Test the minimization
-    model.minimize(data, params=['mu','alpha'])
+    #model.minimize(data, params=['mu','alpha'])
+    model.minimize(data, params=['mu'])
                     
     # Plot the likelihood as a function of mu
     x = scipy.linspace(0, 2, num=100)
