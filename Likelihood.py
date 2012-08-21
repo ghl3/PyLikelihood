@@ -94,17 +94,6 @@ class Likelihood(object):
 
         self.check_value(likelihood_val)
 
-        # Do some sanity checking
-        #if likelihood_val < 0:
-        #    print "Error: Likelihood evaluated to < 0: ", likelihood_val
-        #    raise Exception("LikelihoodEval")
-        #if math.isnan(likelihood_val):
-        #    print "Error: Likelihood value is NAN: ", likelihood_val
-        #    raise Exception("LikelihoodEval")
-        #if math.isinf(likelihood_val):
-        #    print "Error: Likelihood value is INF: ", likelihood_val
-        #    raise Exception("LikelihoodEval")
-
         return likelihood_val
 
 
@@ -125,7 +114,6 @@ class Likelihood(object):
 
         self.set_state(**kwargs)
 
-
         # Get the value
         func_args = self.get_function_args()
         likelihood_val = 1.0
@@ -135,25 +123,6 @@ class Likelihood(object):
         self.check_value(likelihood_val)
         
         return likelihood_val
-        
-        # Set the state based on keyword arguments
-        #for (arg, val) in kwargs.iteritems():
-        #    if arg in self._arg_list:
-        #        setattr(self, arg, val)
-        #    else:
-        #        print "Error: %s is not a parameter of the likelihood" % arg
-        #        raise Exception("Bad Likelihood Parameter")
-
-        # Create the argumets to the function
-        #kw_args = {}
-        #for arg in self._arg_list:
-        #    val = getattr(self, arg)
-        #    kw_args[arg] = val
-
-
-
-        # likelihood_val *= self._likelihood_function(point, **kw_args)
-        #likelihood_val = self._likelihood_function(data, **kw_args)
 
 
     def nll(self, dataset, **kwargs):
@@ -165,20 +134,7 @@ class Likelihood(object):
 
         """
 
-        '''
-        val = 0.0
-        for point in dataset:
-            likelihood_val = self.likelihood(point, **kwargs)
-            if likelihood_val == 0.0:
-                print "Error: Likelihood evaluates to 0.0"
-                raise Exception("LikelihoodEval")
-            try:
-                val += -1*math.log(likelihood_val)
-            except ValueError:
-                print "Encountered Val Error.  Input to log: ", likelihood_val
-                raise Exception("NegativeLogLikelihoodEval")
-        return val
-        '''
+        self.set_state(**kwargs)
 
         likelihood_val = self.likelihood(dataset, **kwargs)
 
@@ -207,8 +163,10 @@ class Likelihood(object):
 
         """
 
-        # Should parse the kwargs for any recognized arguments
-        # and set the state based on them
+        # Set the current state based on keyword args
+        # This will effect the initial guess and any
+        # constant parameters (non-minimized)
+        unused_params = self.set_state(**kwargs)
 
         # Create the function for minimization
         def nnl_for_min(param_values):
@@ -226,7 +184,7 @@ class Likelihood(object):
         print "Minimizing: ", zip(params, guess)
 
         # Run the minimization
-        res = scipy.optimize.minimize(nnl_for_min, guess, **kwargs)
+        res = scipy.optimize.minimize(nnl_for_min, guess, **unused_params)
         print "Successfully Minimized:", res
         #bounds = [self.bounds[param] for param in params]
         #print "Minimizing: ", zip(params, guess, bounds)
@@ -252,19 +210,25 @@ class Likelihood(object):
             print "Error: Must supply nuisance parameters"
             raise Exception("ProfileLikelihood")
 
+        # Set the State
+        self.set_state(**kwargs)
+
+        # Save the current value
         current_poi_value = getattr(self, poi)
 
-        # Get the global minimum
+        # Get the set of parameters
         all_params = [poi]
         all_params.extend(nuisance)
         print "All Params: ", all_params
+
+        # Get the global min
         global_min = self.minimize(dataset, params=all_params, **kwargs)
-        global_nll = self.nll(dataset)
+        global_nll = self.nll(dataset, **kwargs)
 
         # Get the local min at this point
         setattr(self, poi, current_poi_value)
         local_min = self.minimize(dataset, params=nuisance, **kwargs)
-        local_nll = self.nll(dataset)
+        local_nll = self.nll(dataset, **kwargs)
 
         return local_nll - global_nll
 
