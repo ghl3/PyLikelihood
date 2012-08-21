@@ -55,6 +55,59 @@ class Likelihood(object):
         self._likelihood_function = func
 
 
+    def get_function_args(self):
+        """ Return the kwargs for the callable
+        based on the current state
+        """
+        function_args = {}
+        for arg in self._arg_list:
+            val = getattr(self, arg)
+            function_args[arg] = val
+        return function_args
+
+
+    def set_state(self, **kwargs):
+        """ Set the state based on the values of the arguments
+
+        Return any args that aren't parameters of the likelihood
+        """
+        unused_args = {}
+        for (arg, val) in kwargs.iteritems():
+            if arg in self._arg_list:
+                setattr(self, arg, val)
+            else:
+                unused_args[arg] = val
+        return unused_args
+
+
+    def eval(self, data, **kwargs):
+        """ Evaluate the callable function on a single dataset
+        
+        """
+
+        # Set the state based on the kwargs
+        self.set_state(**kwargs)
+
+        # Get the value
+        func_args = self.get_function_args()
+        likelihood_val = self._likelihood_function(point, **func_args)
+
+        self.check_value(likelihood_val)
+
+        # Do some sanity checking
+        #if likelihood_val < 0:
+        #    print "Error: Likelihood evaluated to < 0: ", likelihood_val
+        #    raise Exception("LikelihoodEval")
+        #if math.isnan(likelihood_val):
+        #    print "Error: Likelihood value is NAN: ", likelihood_val
+        #    raise Exception("LikelihoodEval")
+        #if math.isinf(likelihood_val):
+        #    print "Error: Likelihood value is INF: ", likelihood_val
+        #    raise Exception("LikelihoodEval")
+
+        return likelihood_val
+
+
     def likelihood(self, dataset, **kwargs):
         """ Call the likelihood function on the supplied dataset
 
@@ -70,36 +123,37 @@ class Likelihood(object):
 
         """
 
-        # Set the state based on keyword arguments
-        for (arg, val) in kwargs.iteritems():
-            if arg in self._arg_list:
-                setattr(self, arg, val)
-            else:
-                print "Error: %s is not a parameter of the likelihood" % arg
-                raise Exception("Bad Likelihood Parameter")
+        self.set_state(**kwargs)
 
-        # Create the argumets to the function
-        kw_args = {}
-        for arg in self._arg_list:
-            val = getattr(self, arg)
-            kw_args[arg] = val
 
+        # Get the value
+        func_args = self.get_function_args()
         likelihood_val = 1.0
         for point in dataset:
-            likelihood_val *= self._likelihood_function(point, **kw_args)
-        #likelihood_val = self._likelihood_function(data, **kw_args)
+            likelihood_val *= self._likelihood_function(point, **func_args)
+            
+        self.check_value(likelihood_val)
         
-        if likelihood_val < 0:
-            print "Error: Likelihood evaluated to < 0: ", likelihood_val
-            raise Exception("LikelihoodEval")
-        if math.isnan(likelihood_val):
-            print "Error: Likelihood value is NAN: ", likelihood_val
-            raise Exception("LikelihoodEval")
-        if math.isinf(likelihood_val):
-            print "Error: Likelihood value is INF: ", likelihood_val
-            raise Exception("LikelihoodEval")
-
         return likelihood_val
+        
+        # Set the state based on keyword arguments
+        #for (arg, val) in kwargs.iteritems():
+        #    if arg in self._arg_list:
+        #        setattr(self, arg, val)
+        #    else:
+        #        print "Error: %s is not a parameter of the likelihood" % arg
+        #        raise Exception("Bad Likelihood Parameter")
+
+        # Create the argumets to the function
+        #kw_args = {}
+        #for arg in self._arg_list:
+        #    val = getattr(self, arg)
+        #    kw_args[arg] = val
+
+
+
+        # likelihood_val *= self._likelihood_function(point, **kw_args)
+        #likelihood_val = self._likelihood_function(data, **kw_args)
 
 
     def nll(self, dataset, **kwargs):
@@ -127,14 +181,13 @@ class Likelihood(object):
         '''
 
         likelihood_val = self.likelihood(dataset, **kwargs)
-        if likelihood_val == 0.0:
-            print "Error: Likelihood evaluates to 0.0"
-            raise Exception("LikelihoodEval")
+
         try:
             neg_log_val = -1*math.log(likelihood_val)
         except ValueError:
             print "Encountered Val Error.  Input to log: ", likelihood_val
             raise Exception("NegativeLogLikelihoodEval")
+
         return neg_log_val
 
 
@@ -214,3 +267,17 @@ class Likelihood(object):
         local_nll = self.nll(dataset)
 
         return local_nll - global_nll
+
+
+    def check_value(self, val):
+        if val <= 0.0:
+            print "Error: Likelihood evaluated to < 0: ", val
+            raise Exception("LikelihoodEval")
+        if math.isnan(val):
+            print "Error: Likelihood value is NAN: ", val
+            raise Exception("LikelihoodEval")
+        if math.isinf(val):
+            print "Error: Likelihood value is INF: ", val
+            raise Exception("LikelihoodEval")
+        return
+

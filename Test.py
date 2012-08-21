@@ -54,18 +54,7 @@ def main():
     print model.likelihood(dataset)
     model.minimize(dataset, params=['y'])
 
-    # Test the pois
-    '''
-    x = np.arange(-5, 5, .1)
-    y = [gauss(point, 0, 1) for point in x]
-    plt.figure()
-    plt.plot(x, y)
-    plt.savefig("gauss.pdf")
-    '''
-
     # Create a likelihood model
-    #model = Likelihood()
-    #model.SetLikelihood(simple_likelihood)
     model = Likelihood(simple_likelihood)
 
     model.n = 10
@@ -93,17 +82,22 @@ def main():
     model.minimize(data, params=['mu'])
     model.minimize(data, params=['mu','alpha_1'])
     model.minimize(data, params=['mu','alpha_1', 'alpha_2'])
-    return
                     
     # Plot the likelihood as a function of mu
     x = scipy.linspace(0, 2, num=100)
+    #y = [model.profile(data, mu=p) for p in x]
     y = [model.nll(data, mu=p) for p in x]
-    #pylab.plot(x, y)
     plt.figure()
     plt.plot(x,y)
-    #plt.axis([0, 3, 0, 20])
     plt.savefig("nll.pdf")    
     return
+
+    # Test the pois
+    x = np.arange(-5, 5, .1)
+    y = [gauss(point, 0, 1) for point in x]
+    plt.figure()
+    plt.plot(x, y)
+    plt.savefig("gauss.pdf")
 
 
     #x = scipy.linspace(0,10,11)
