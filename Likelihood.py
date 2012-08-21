@@ -120,7 +120,7 @@ class Likelihood(object):
         return val
 
 
-    def minimize(self, data, params=[], **kwargs):
+    def minimize(self, data, params, **kwargs):
         """ Minmize the supplied parameters based on the nll
 
         Set the values of the minimized parameters in the
@@ -135,6 +135,9 @@ class Likelihood(object):
         optimize when the likelihood function is initialized...)
 
         """
+
+        print "Minimizing the following parameters:"
+        params
 
         # Create the function for minimization
         def nnl_for_min(param_values):
@@ -165,3 +168,31 @@ class Likelihood(object):
             setattr(self, param, val)
 
         return min
+
+
+    def profile(self, data, poi, nuisance, **kwargs):
+        """ Return the profile likelihood as a function of the poi
+        (parameter of interest), minimizing over the nuisance parameters
+
+        return the nll of the profile likelihood
+        """
+
+        if len(nuisance)==0:
+            print "Error: Must supply nuisance parameters"
+            raise Exception("ProfileLikelihood")
+
+        current_poi_value = getattr(self, poi)
+
+        # Get the global minimum
+        all_params = [poi]
+        all_params.extend(nuisance)
+        print "All Params: ", all_params
+        global_min = self.minimize(data, params=all_params, **kwargs)
+        global_nll = self.nll(data)
+
+        # Get the local min at this point
+        setattr(self, poi, current_poi_value)
+        local_min = self.minimize(data, params=nuisance, **kwargs)
+        local_nll = self.nll(data)
+
+        return local_nll - global_nll

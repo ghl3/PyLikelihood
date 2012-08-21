@@ -59,6 +59,10 @@ def main():
 
     data = [12]
 
+    pll = model.profile(data, "mu", nuisance=['alpha_1', 'alpha_2'])
+    print "Profile Likelihood: ", pll
+    return
+
     print model.likelihood(data)
     model.print_state()
 
