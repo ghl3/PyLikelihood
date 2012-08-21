@@ -25,6 +25,8 @@ class Likelihood(object):
         self._arg_list=[]
         self._likelihood_function=None
 
+    def print_state(self):
+        pprint(vars(self))
 
     def SetLikelihood(self, func, **kwargs):
         """ Set the likelihood function to be 'func'
@@ -117,63 +119,45 @@ class Likelihood(object):
         val = 0.0
         for point in data:
             val += -1*math.log(self.likelihood(point, **kwargs))
-            #try:
-            #    val += -1*math.log(self.likelihood(point, **kwargs))
-            #except ValueError:
-            #    return 999999 #np.inf # Inf #sys.float_info.max
         return val
 
 
-        
-    def print_state(self):
-        pprint(vars(self))
-
-        
-
-
     def minimize(self, data, params=[], **kwargs):
+        """ Minmize the supplied parameters based on the nll
+
+        Set the values of the minimized parameters in the
+        likelihood's 'state'.  Use any keyword arguments as
+        initial values to parameters, or for any other
+        (non-minimized) parameters in the model
+
+        """
 
         # Create the function for minimization
         def nnl_for_min(param_values):
-            """ Minimize the likelihood over all supplied params
+            """ Create the wrapper function for scipy.optimize
 
             """
-            
-            # Set the value of the var and the nuisance
+
             for (nuis, val) in zip(params, param_values):
                 setattr(self, nuis, val)
             self.print_state()
             return self.nll(data, **kwargs)
 
-        # Get the global minimum
+        # Get the initial guess
         guess = [getattr(self, param) for param in params]
         print "Minimizing: ", zip(params, guess)
-        res = scipy.optimize.minimize(nnl_for_min, guess)
 
+        # Run the minimization
+        res = scipy.optimize.minimize(nnl_for_min, guess)
+        print "Successfully Minimized:", res
         #bounds = [self.bounds[param] for param in params]
         #print "Minimizing: ", zip(params, guess, bounds)
         #res = scipy.optimize.minimize(nnl_for_min, guess, bounds=bounds, method='SLSQP')
         
         # Set the values to the minimum
         min_values = res.x
-        
-        print "Successfully Minimized:", res
         for (param, val) in zip(params, min_values):
             print param, val
             setattr(self, param, val)
 
         return min
-
-    #
-    # Experimental Methods
-    #
-
-
-
-        
-'''
-    def profile(self, dataset, var, nuisance=[]):
-        """ Return the profile likelihood of 'var',
-        minimizing over all parameters in 'profile'
-        """
-'''
