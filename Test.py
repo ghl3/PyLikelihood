@@ -89,8 +89,10 @@ def main():
     x = scipy.linspace(0, 2, num=100)
     #y = [model.profile(data, mu=p) for p in x]
     y = [model.nll(data, mu=p) for p in x]
+    z = [model.profile(data, "mu", ["alpha_1", "alpha_2"], mu=p) for p in x]
     plt.figure()
     plt.plot(x,y)
+    plt.plot(x,z)
     plt.savefig("nll.pdf")    
     return
 

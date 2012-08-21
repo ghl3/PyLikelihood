@@ -8,6 +8,9 @@ from pprint import pprint
 import scipy.optimize
 
 class Likelihood(object):
+
+    _cache = {}
+
     def __init__(self, func=None):
         self._arg_list=[]
         self._likelihood_function=None
@@ -224,9 +227,21 @@ class Likelihood(object):
         all_params.extend(nuisance)
         print "All Params: ", all_params
 
+        # Get the constant parameters
+        const_params = []
+        for (param) in self._arg_list:
+            if param == poi: continue
+            if param in nuisance: continue
+            const_params.append( (param, getattr(self, param)) )
+        const_params = tuple(const_params)
+
         # Get the global min
-        global_min = self.minimize(dataset, params=all_params, **kwargs)
-        global_nll = self.nll(dataset, **kwargs)
+        if const_params not in self._cache:
+            global_min = self.minimize(dataset, params=all_params, **kwargs)
+            global_nll = self.nll(dataset, **kwargs)
+            self._cache[const_params] = global_nll
+        else:
+            global_nll = self._cache[const_params]
 
         # Get the local min at this point
         setattr(self, poi, current_poi_value)
