@@ -17,14 +17,22 @@ def gauss(x, mu, sigma):
     rv = norm(loc=mu, scale=sigma)
     return rv.pdf([x])[0]
 
-def simple_likelihood(d, n, mu, alpha, delta):
+def simple_likelihood(d, n, mu, alpha_1, delta_1, alpha_2, delta_2):
     """ The probability of a single data point given parametres
     
     """
-    n_hat = n*mu*(1.0 + alpha*delta)
-    val = pois(d, n_hat)*gauss(0.0, alpha, 1.0)
+    n_hat = n*mu*(1.0 + alpha_1*delta_1 + alpha_2*delta_2)
+    val = pois(d, n_hat)*gauss(0.0, alpha_1, 1.0)*gauss(0.0, alpha_2, 1.0)
+
+    # Add some simple protection
+    small_num = .00000000000000000000000000000000001 
     if math.isnan(val):
-        return .0000000001
+        print "Val is NAN"
+        return small_num
+    if val <= small_num:
+        print "Val is small", val
+        return small_num
+
     return val
 
 
@@ -42,23 +50,29 @@ def main():
     #model.SetLikelihood(simple_likelihood)
     model = Likelihood(simple_likelihood)
 
-    model.n = 100
+    model.n = 10
     model.mu = 1.0
-    model.alpha = 0
-    model.delta = 20
+    model.alpha_1 = 0
+    model.delta_1 = 2
+    model.alpha_2 = 0
+    model.delta_2 = 3
 
-    data = [110]
+    data = [12]
 
-    print model
     print model.likelihood(data)
     model.print_state()
-    print model.likelihood(data, alpha=1)
+
+    print model.likelihood(data, alpha_1=1)
     model.print_state()
+
+    model.alpha_1=0.0
 
     # Test the minimization
     #model.minimize(data, params=['mu','alpha'])
-    model.minimize(data, params=['mu'], alpha=0.0)
-    model.minimize(data, params=['mu','alpha'])
+    model.minimize(data, params=['mu'])
+    model.minimize(data, params=['mu','alpha_1'])
+    model.minimize(data, params=['mu','alpha_1', 'alpha_2'])
+    return
                     
     # Plot the likelihood as a function of mu
     x = scipy.linspace(0, 2, num=100)

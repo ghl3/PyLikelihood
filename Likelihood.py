@@ -108,7 +108,15 @@ class Likelihood(object):
 
         val = 0.0
         for point in data:
-            val += -1*math.log(self.likelihood(point, **kwargs))
+            likelihood_val = self.likelihood(point, **kwargs)
+            if likelihood_val == 0.0:
+                print "Error: Likelihood evaluates to 0.0"
+                raise Exception("LikelihoodEval")
+            try:
+                val += -1*math.log(likelihood_val)
+            except ValueError:
+                print "Encountered Val Error.  Input to log: ", likelihood_val
+                raise Exception("NegativeLogLikelihoodEval")
         return val
 
 
