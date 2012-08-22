@@ -9,7 +9,7 @@ import numpy as np
 
 from scipy.stats import poisson
 from scipy.stats import norm
-
+import scipy.integrate
 
 def pois(x, l):
     rv = poisson([l])
@@ -27,7 +27,7 @@ def simple_likelihood(d, n, mu, alpha_1, delta_1, alpha_2, delta_2):
     val = pois(d, n_hat)*gauss(0.0, alpha_1, 1.0)*gauss(0.0, alpha_2, 1.0)
 
     # Add some simple protection
-    small_num =  10e-20
+    small_num =  10e-25
     if math.isnan(val):
         #print "Val is NAN"
         return small_num
@@ -44,6 +44,11 @@ def my_func(x, y):
 
 def main():
 
+    FORMAT = "%(message)s"
+    logging.basicConfig(format=FORMAT)
+    logging.root.setLevel(logging.DEBUG)
+
+    # Test the integral
     # Create a simple likelihood model
     model = Likelihood(my_func)
     model.y=0.0
@@ -62,11 +67,23 @@ def main():
     model.n = 10
     model.mu = 1.0
     model.alpha_1 = 0
-    model.delta_1 = 2
+    model.delta_1 = .2
     model.alpha_2 = 0
-    model.delta_2 = 3
+    model.delta_2 = .3
 
-    data = [12, 14]
+    data = [12]
+
+    # Test the integral
+    '''
+    integral = 0.0
+    for point in range(0, 100):
+        integral += model.eval(point)
+    print "Integral: ", integral
+    print "Scipy Integral: ", model.integral()
+    return
+    '''
+
+
 
     pll = model.profile(data, "mu", nuisance=['alpha_1', 'alpha_2'])
     print "Profile Likelihood: ", pll
@@ -88,11 +105,15 @@ def main():
     # Plot the likelihood as a function of mu
     x = scipy.linspace(0, 2, num=100)
     #y = [model.profile(data, mu=p) for p in x]
+    model.log.setLevel(logging.WARNING)
     y = [model.nll(data, mu=p) for p in x]
     z = [model.profile(data, "mu", ["alpha_1", "alpha_2"], mu=p) for p in x]
+    model.log.setLevel(logging.DEBUG)
+    #z = [model.profile(data, "mu", ['alpha_1'], mu=p) for p in x]
     plt.figure()
-    plt.plot(x,y)
-    plt.plot(x,z)
+    plt.plot(x,y, label="nll")
+    plt.plot(x,z, label="profile")
+    plt.legend()
     plt.savefig("nll.pdf")    
     return
 

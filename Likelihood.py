@@ -2,13 +2,16 @@
 import sys
 import math
 
+import logging
 import inspect
 from pprint import pprint
 
 import scipy.optimize
+import scipy.integrate
 
 class Likelihood(object):
 
+    log = logging.getLogger()
     _cache = {}
 
     def __init__(self, func=None):
@@ -17,6 +20,11 @@ class Likelihood(object):
         if func == None:
             return
         self.SetLikelihood(func)
+
+    #def ActivateLogging(level=logging.DEBUG):
+    #    FORMAT = "%(message)s"
+    #    logging.basicConfig(format=FORMAT)
+    #    logging.root.setLevel(logging.DEBUG)
 
     def SetLikelihood(self, func, **kwargs):
         """ Set the likelihood function to be 'func'
@@ -47,8 +55,8 @@ class Likelihood(object):
 
         for arg_name in kwargs:
             if arg_name not in arg_list:
-                print "Error: SetLikelihood recieved argument %s" % arg_name,
-                print " but this is not a keyword argument of the likelihood"
+                self._log.error("Error: SetLikelihood recieved argument %s" % arg_name /
+                               " but this is not a keyword argument of the likelihood" )
                 raise Exception("Likelihood Argument Error")
 
         self._arg_list = arg_list
@@ -85,7 +93,17 @@ class Likelihood(object):
         for arg in self._arg_list:
             state[arg] = getattr(self, arg)
         return state
+
+
+    def integral(self, min, max, **kwargs):
+        """ Get the integral of the function evaluated over data
+
+        """
+        self.set_state(**kwargs)
+        result = scipy.integrate.quad(self.eval, min, max)
+        return result[0]
         
+
     def eval(self, data_point, **kwargs):
         """ Evaluate the callable function on a single dataset
         
@@ -147,7 +165,7 @@ class Likelihood(object):
         try:
             neg_log_val = -1*math.log(likelihood_val)
         except ValueError:
-            print "Encountered Val Error.  Input to log: ", likelihood_val
+            self.log.error("Encountered Val Error.  Input to log: ", likelihood_val)
             raise Exception("NegativeLogLikelihoodEval")
 
         return neg_log_val
@@ -174,6 +192,9 @@ class Likelihood(object):
         # constant parameters (non-minimized)
         unused_params = self.set_state(**kwargs)
 
+        if len(params)==0:
+            return
+
         # Create the function for minimization
         def nnl_for_min(param_values):
             """ Create the wrapper function for scipy.optimize
@@ -182,16 +203,19 @@ class Likelihood(object):
 
             for (nuis, val) in zip(params, param_values):
                 setattr(self, nuis, val)
-            print self.get_state()
+            #print self.get_state()
             return self.nll(dataset)
 
         # Get the initial guess
         guess = [getattr(self, param) for param in params]
-        print "Minimizing: ", zip(params, guess)
+        self.log.debug("Minimizing: ")
+        for param, val in zip(params, guess):
+            self.log.debug("%s : %s" % (param, val))
 
         # Run the minimization
         res = scipy.optimize.minimize(nnl_for_min, guess, **unused_params)
-        print "Successfully Minimized:", res
+        self.log.debug("Successfully Minimized:", res)
+
         #bounds = [self.bounds[param] for param in params]
         #print "Minimizing: ", zip(params, guess, bounds)
         #res = scipy.optimize.minimize(nnl_for_min, guess, bounds=bounds, method='SLSQP')
@@ -199,7 +223,7 @@ class Likelihood(object):
         # Set the values to the minimum
         min_values = res.x
         for (param, val) in zip(params, min_values):
-            print param, val
+            self.log.debug("%s : %s" % (param, val))
             setattr(self, param, val)
 
         return min
@@ -212,9 +236,9 @@ class Likelihood(object):
         return the nll of the profile likelihood
         """
 
-        if len(nuisance)==0:
-            print "Error: Must supply nuisance parameters"
-            raise Exception("ProfileLikelihood")
+        #if len(nuisance)==0:
+        #    print "Error: Must supply nuisance parameters"
+        #    raise Exception("ProfileLikelihood")
 
         # Set the State
         self.set_state(**kwargs)
@@ -225,7 +249,7 @@ class Likelihood(object):
         # Get the set of parameters
         all_params = [poi]
         all_params.extend(nuisance)
-        print "All Params: ", all_params
+        self.log.debug( "All Params: %s" % all_params)
 
         # Get the constant parameters
         const_params = []
@@ -248,18 +272,18 @@ class Likelihood(object):
         local_min = self.minimize(dataset, params=nuisance, **kwargs)
         local_nll = self.nll(dataset, **kwargs)
 
-        return local_nll - global_nll
+        return local_nll #- global_nll
 
 
     def check_value(self, val):
         if val <= 0.0:
-            print "Error: Likelihood evaluated to < 0: ", val
+            self.log.error("Error: Likelihood evaluated to < 0: ", val)
             raise Exception("LikelihoodEval")
         if math.isnan(val):
-            print "Error: Likelihood value is NAN: ", val
+            self.log.error("Error: Likelihood value is NAN: ", val)
             raise Exception("LikelihoodEval")
         if math.isinf(val):
-            print "Error: Likelihood value is INF: ", val
+            self.log.error("Error: Likelihood value is INF: ", val)
             raise Exception("LikelihoodEval")
         return
 
