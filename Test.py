@@ -63,12 +63,30 @@ def main():
 
     # Sample the model:
     model.setRange('y', -5, 5)
-    
-    for i in range(10):
-        print model.sample(dataset, args=['y'])
+
+
+    likelihood_samples = []
+    y_samples = []
+    for i in range(1000):
+        sample = model.sample(dataset, args=['y'])
+        print sample
+        likelihood_samples.append(sample['likelihood'])
+        y_samples.append(sample['values']['y'])
+
+    plt.figure()
+    points = scipy.linspace(-5, 5, num=100)
+    y = [model.likelihood(dataset, y=p) for p in points]
+    plt.plot(points, y, label="likelihood")
+    plt.hist(y_samples, 100, normed=1, facecolor='g', alpha=0.75, label="sampled")
+    plt.legend()
+    plt.savefig("sample_test.pdf")    
+
     return
 
+    #
     # Create a more complicated likelihood model
+    #
+
     model = Likelihood(simple_likelihood)
 
     model.n = 10
