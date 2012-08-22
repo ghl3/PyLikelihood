@@ -50,34 +50,37 @@ def main():
 
     # Test the integral
     # Create a simple likelihood model
-    model = Likelihood(my_func)
-    model.y=0.0
+    model = Likelihood(gauss)
+    model.mu=0.0
+    model.sigma=1.0
     print model.get_state()
     dataset = [2]
 
     print model.eval(2)
-    print model.eval(2, y=3)
+    print model.eval(2, mu=3)
 
     print model.likelihood(dataset)
-    model.minimize(dataset, params=['y'])
+    model.minimize(dataset, params=['mu'])
 
     # Sample the model:
-    model.setRange('y', -5, 5)
+    model.setRange('mu', -5, 5)
 
+    print "Scipy Integral: ", model.integral(dataset, 'mu')
+    return
 
     likelihood_samples = []
-    y_samples = []
-    for i in range(1000):
-        sample = model.sample(dataset, args=['y'])
+    mu_samples = []
+    for i in range(5000):
+        sample = model.sample(dataset, args=['mu'])
         print sample
         likelihood_samples.append(sample['likelihood'])
-        y_samples.append(sample['values']['y'])
+        mu_samples.append(sample['values']['mu'])
 
     plt.figure()
     points = scipy.linspace(-5, 5, num=100)
-    y = [model.likelihood(dataset, y=p) for p in points]
+    y = [model.likelihood(dataset, mu=p) for p in points]
     plt.plot(points, y, label="likelihood")
-    plt.hist(y_samples, 100, normed=1, facecolor='g', alpha=0.75, label="sampled")
+    plt.hist(mu_samples, 100, normed=1, facecolor='g', alpha=0.75, label="sampled")
     plt.legend()
     plt.savefig("sample_test.pdf")    
 

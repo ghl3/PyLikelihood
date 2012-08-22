@@ -16,6 +16,7 @@ class Likelihood(object):
 
     _arg_list=[]
     _likelihood_function=None
+    _integral_value=1.0
     _var_ranges = {}
     _cache = {}
     log = logging.getLogger()
@@ -103,17 +104,7 @@ class Likelihood(object):
         state = {}
         for arg in self._arg_list:
             state[arg] = getattr(self, arg)
-        return state
-
-
-    def integral(self, min, max, **kwargs):
-        """ Get the integral of the function evaluated over data
-
-        """
-        self.set_state(**kwargs)
-        result = scipy.integrate.quad(self.eval, min, max)
-        return result[0]
-        
+        return state        
 
     def eval(self, data_point, **kwargs):
         """ Evaluate the callable function on a single dataset
@@ -284,6 +275,32 @@ class Likelihood(object):
         local_nll = self.nll(dataset, **kwargs)
 
         return local_nll #- global_nll
+
+
+    def integral(self, dataset, param, range=None):
+        """ Get the integral of the function evaluated over data
+
+        """
+        
+        if range == None and param not in self._var_ranges:
+            self.log.error("Integral: Param %s has no range" % param)
+            raise Exception("IntegralRange")
+
+        if range==None:
+            range = self._var_ranges[param]
+
+        saved_state = self.get_state()
+
+        def func_for_integral(val):
+            setattr(self, param, val)
+            return self.eval(dataset)
+
+        result = scipy.integrate.quad(func_for_integral, range[0], range[1])
+
+        self.set_state(**saved_state)
+
+        return result[0]
+
 
     def sample(self, dataset, args=[]):
         
