@@ -61,6 +61,13 @@ def main():
     print model.likelihood(dataset)
     model.minimize(dataset, params=['y'])
 
+    # Sample the model:
+    model.setRange('y', -5, 5)
+    
+    for i in range(10):
+        print model.sample(dataset, args=['y'])
+    return
+
     # Create a more complicated likelihood model
     model = Likelihood(simple_likelihood)
 

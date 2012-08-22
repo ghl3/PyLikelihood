@@ -8,25 +8,36 @@ from pprint import pprint
 
 import scipy.optimize
 import scipy.integrate
+#import scipy.random
+import random
+#import random.uniform
 
 class Likelihood(object):
 
-    log = logging.getLogger()
+    _arg_list=[]
+    _likelihood_function=None
+    _var_ranges = {}
     _cache = {}
+    log = logging.getLogger()
 
     def __init__(self, func=None):
-        self._arg_list=[]
-        self._likelihood_function=None
         if func == None:
             return
-        self.SetLikelihood(func)
+        self.setLikelihood(func)
+
+    def setRange(self, param, min, max):
+        if param in self._arg_list:
+            self._var_ranges[param] = (min, max)
+        else:
+            self.log.error("Cannot set range, param %s not found" % param)
+            raise Exception("ParamNotFound")
 
     #def ActivateLogging(level=logging.DEBUG):
     #    FORMAT = "%(message)s"
     #    logging.basicConfig(format=FORMAT)
     #    logging.root.setLevel(logging.DEBUG)
 
-    def SetLikelihood(self, func, **kwargs):
+    def setLikelihood(self, func, **kwargs):
         """ Set the likelihood function to be 'func'
 
         The first argument is interpreted as a list
@@ -55,7 +66,7 @@ class Likelihood(object):
 
         for arg_name in kwargs:
             if arg_name not in arg_list:
-                self._log.error("Error: SetLikelihood recieved argument %s" % arg_name /
+                self._log.error("Error: setLikelihood recieved argument %s" % arg_name /
                                " but this is not a keyword argument of the likelihood" )
                 raise Exception("Likelihood Argument Error")
 
@@ -273,6 +284,41 @@ class Likelihood(object):
         local_nll = self.nll(dataset, **kwargs)
 
         return local_nll #- global_nll
+
+    def sample(self, dataset, args=[]):
+        
+        for arg in args:
+            if arg not in self._var_ranges:
+                self.log.error("Cannot sample parameter %s, must supply range" % arg)
+                raise Exception("SampleError")
+            pass
+
+        # Save the current state
+        saved_state = self.get_state()
+        
+        while True:
+            
+            # Set the values
+            for arg in args:
+                range = self._var_ranges[arg]
+                val = random.uniform(range[0], range[1])
+                setattr(self, arg, val)
+            
+            # Get the likelihood
+            lhood = self.likelihood(dataset)
+
+            # Throw the Monte-Carlo dice:
+            mc_val = random.uniform(0.0, 1.0)
+
+            if lhood > mc_val:
+                break
+
+        sampled_values = {}
+        for arg in args:
+            sampled_values[arg] = getattr(self, arg)
+
+        self.set_state(**saved_state)
+        return {"values" : sampled_values, "likelihood" : lhood}
 
 
     def check_value(self, val):
