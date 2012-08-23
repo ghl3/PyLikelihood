@@ -66,20 +66,24 @@ def main():
     model.setRange('mu', -5, 5)
 
     print "Scipy Integral: ", model.integral(dataset, 'mu')
-    return
 
-    likelihood_samples = []
-    mu_samples = []
-    for i in range(5000):
-        sample = model.sample(dataset, args=['mu'])
-        print sample
-        likelihood_samples.append(sample['likelihood'])
-        mu_samples.append(sample['values']['mu'])
+    # Test the sampling
+    samples = model.sample(dataset, params=['mu'], nsamples=500, method='mcmc')
+    lik_samples = [model.eval(dataset, **sample) for sample in samples]
+    mu_samples = [sample['mu'] for sample in samples]
+
+    #for i in range(5000):
+    #    sample = model.sample(dataset, args=['mu'])
+    #    print sample
+    #    likelihood_samples.append(sample['likelihood'])
+    #    mu_samples.append(sample['values']['mu'])
 
     plt.figure()
+    # Get the "true" values
     points = scipy.linspace(-5, 5, num=100)
     y = [model.likelihood(dataset, mu=p) for p in points]
     plt.plot(points, y, label="likelihood")
+    # Plot the histogram of samples
     plt.hist(mu_samples, 100, normed=1, facecolor='g', alpha=0.75, label="sampled")
     plt.legend()
     plt.savefig("sample_test.pdf")    

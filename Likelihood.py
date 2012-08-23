@@ -151,6 +151,9 @@ class Likelihood(object):
         return likelihood_val
 
 
+    def loglikelihood(self, dataset, **kwargs):
+        return math.log(self.likelihood(dataset, **kwargs))
+
     def nll(self, dataset, **kwargs):
         """ Return the negative log likelihood 
 
@@ -302,7 +305,7 @@ class Likelihood(object):
         return result[0]
 
 
-    def generate(self, dataset, params, method='mcmc', **kwargs):
+    def sample(self, dataset, params, nsamples=1, method='mc', **kwargs):
         """
         Generate sample points based on the given likelihood
 
@@ -312,14 +315,14 @@ class Likelihood(object):
             print "Must supply method for generate()"
             raise Exception("generate")
         elif method=='mcmc':
-            return sample_mcmc(self, dataset, params, **kwargs)
+            return self.sample_mcmc(dataset, params, nsamples, **kwargs)
         elif method=='mc':
-            return sample_mc(self, dataset, params, **kwargs)
+            return self.sample_mc(dataset, params, nsamples, **kwargs)
         else:
             print "Supplied invalid method for generate(): %s" % method
             raise Exception("generate")
 
-    def sample_mcmc(self, dataset, params=[], nsamples=1, nwalkers=5):
+    def sample_mcmc(self, dataset, params=[], nsamples=1, nwalkers=6):
         """
         
         Generate 'nsamples' points based on the likelihood
@@ -344,7 +347,7 @@ class Likelihood(object):
             
             # Set the state based on the input list
             for (param, val) in zip(params, val_list):
-                setattr(self, arg, val)
+                setattr(self, param, val)
                 
             # Return the log likelihood
             log_lhood = self.loglikelihood(dataset)
@@ -352,11 +355,11 @@ class Likelihood(object):
 
         # Setup emcee
         # WARNING: Check ranges here
-        p0 = [[random.uniform(-1, 1)] for i in xrange(params)]
+        p0 = [[random.uniform(-1, 1) for i in params] for j in xrange(nwalkers)]
     
-        nwalkers
+        #nwalkers
         ndim = len(params)
-        sampler = emcee.EnsembleSampler(nwalkers, ndim, fun_for_emcee)
+        sampler = emcee.EnsembleSampler(nwalkers, ndim, func_for_emcee)
 
         # Run 500 steps as a burn-in.
         pos, prob, state = sampler.run_mcmc(p0, 500)
@@ -383,8 +386,8 @@ class Likelihood(object):
     def sample_mc(self, dataset, params=[], nsamples=1):
         
         for param in params:
-            if arg not in self._var_ranges:
-                self.log.error("Cannot sample parameter %s, must supply range" % arg)
+            if param not in self._var_ranges:
+                self.log.error("Cannot sample parameter %s, must supply range" % param)
                 raise Exception("SampleError")
             pass
 
