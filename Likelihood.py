@@ -8,9 +8,10 @@ from pprint import pprint
 
 import scipy.optimize
 import scipy.integrate
-#import scipy.random
+
 import random
-#import random.uniform
+
+import emcee
 
 class Likelihood(object):
 
@@ -302,9 +303,79 @@ class Likelihood(object):
         return result[0]
 
 
-    def sample(self, dataset, args=[]):
+    def generate(self, dataset, params, method='mcmc', **kwargs):
+        """
+        Generate sample points based on the given likelihood
+
+        """
+
+        if method=='':
+            print "Must supply method for generate()"
+            raise Exception("generate")
+        elif method=='mcmc':
+            return sample_mcmc(self, dataset, params, **kwargs)
+        elif method=='mc':
+            return sample_mc(self, dataset, params, **kwargs)
+        else:
+            print "Supplied invalid method for generate(): %s" % method
+            raise Exception("generate")
+
+    def sample_mcmc(self, dataset, params=[], nsamples=1, nwalkers=5):
+        """
         
-        for arg in args:
+        Generate 'nsamples' points based on the likelihood
+        Use the emcee package for MarkovChain Monte-Carlo
+
+        return a list of dictionaries of name, val pairs for the
+        supplied points
+        """
+        saved_state = self.get_state()
+
+        def func_for_emcee(val_list):
+            """ Requires the log probability and 
+            params as an array """
+            
+            # Set the state based on the input list
+            for (param, val) in zip(params, val_list):
+                setattr(self, arg, val)
+                
+            # Return the log likelihood
+            log_lhood = self.loglikelihood(dataset)
+            return log_lhood
+
+        # Setup emcee
+        # WARNING: Check ranges here
+        p0 = [[random.uniform(-1, 1)] for i in xrange(params)]
+    
+        nwalkers
+        ndim = len(params)
+        sampler = emcee.EnsembleSampler(nwalkers, ndim, fun_for_emcee)
+
+        # Run 500 steps as a burn-in.
+        pos, prob, state = sampler.run_mcmc(p0, 500)
+
+        # Reset the chain to remove the burn-in samples.
+        sampler.reset()
+        
+        # Starting from the final position in the burn-in chain, sample for 2000
+        # steps.
+        sampler.run_mcmc(pos, nsamples, rstate0=state)
+        
+        # Unpack the results
+        results = []
+        for (isample,sample) in enumerate(sampler.flatchain):
+            point = {}
+            for (iparam, param) in enumerate(params):
+                point[param] = sample[iparam]
+            results.append(point)
+        
+        self.set_state(**saved_state)
+        return results
+        
+
+    def sample_mc(self, dataset, params=[], nsamples=1):
+        
+        for param in params:
             if arg not in self._var_ranges:
                 self.log.error("Cannot sample parameter %s, must supply range" % arg)
                 raise Exception("SampleError")
@@ -312,30 +383,34 @@ class Likelihood(object):
 
         # Save the current state
         saved_state = self.get_state()
-        
-        while True:
+
+        results=[]
+        for i_sample in xrange(nsamples):
+            while True:
             
-            # Set the values
-            for arg in args:
-                range = self._var_ranges[arg]
-                val = random.uniform(range[0], range[1])
-                setattr(self, arg, val)
+                # Set the values
+                for param in params:
+                    range = self._var_ranges[param]
+                    val = random.uniform(range[0], range[1])
+                    setattr(self, param, val)
             
-            # Get the likelihood
-            lhood = self.likelihood(dataset)
+                # Get the likelihood
+                lhood = self.likelihood(dataset)
 
-            # Throw the Monte-Carlo dice:
-            mc_val = random.uniform(0.0, 1.0)
+                # Throw the Monte-Carlo dice:
+                mc_val = random.uniform(0.0, 1.0)
 
-            if lhood > mc_val:
-                break
+                if lhood > mc_val:
+                    break
 
-        sampled_values = {}
-        for arg in args:
-            sampled_values[arg] = getattr(self, arg)
+            point = {}
+            for param in params:
+                point[param] = getattr(self, param)
+
+            results.append(point)
 
         self.set_state(**saved_state)
-        return {"values" : sampled_values, "likelihood" : lhood}
+        return results
 
 
     def check_value(self, val):
