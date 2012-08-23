@@ -11,7 +11,6 @@ import scipy.integrate
 
 import random
 
-import emcee
 
 class Likelihood(object):
 
@@ -329,6 +328,14 @@ class Likelihood(object):
         return a list of dictionaries of name, val pairs for the
         supplied points
         """
+
+        try:
+            import emcee
+        except ImportError:
+            print "Cannot use Markov Chain Monte Carlo, must install 'emcee' package"
+            print "See: https://danfm.ca/emcee/"
+            raise
+
         saved_state = self.get_state()
 
         def func_for_emcee(val_list):
