@@ -48,28 +48,31 @@ def main():
     logging.basicConfig(format=FORMAT)
     logging.root.setLevel(logging.DEBUG)
 
+    # Create the dataset
+    dataset = [2]
+
     # Test the integral
     # Create a simple likelihood model
-    model = Likelihood(gauss)
+
+    model = Likelihood(dataset, gauss)
     model.mu=0.0
     model.sigma=1.0
     print model.get_state()
-    dataset = [2]
 
     print model.eval(2)
     print model.eval(2, mu=3)
 
-    print model.likelihood(dataset)
-    model.minimize(dataset, params=['mu'])
+    print model.likelihood()
+    model.minimize(params=['mu'])
 
     # Sample the model:
     model.setRange('mu', -5, 5)
 
-    print "Scipy Integral: ", model.integral(dataset, 'mu')
+    print "Scipy Integral: ", model.integral(2, 'mu')
 
     # Test the sampling
-    samples = model.sample(dataset, params=['mu'], nsamples=500, method='mcmc')
-    lik_samples = [model.eval(dataset, **sample) for sample in samples]
+    samples = model.sample(params=['mu'], nsamples=500, method='mcmc')
+    lik_samples = [model.likelihood(**sample) for sample in samples]
     mu_samples = [sample['mu'] for sample in samples]
 
     #for i in range(5000):
@@ -81,7 +84,7 @@ def main():
     plt.figure()
     # Get the "true" values
     points = scipy.linspace(-5, 5, num=100)
-    y = [model.likelihood(dataset, mu=p) for p in points]
+    y = [model.likelihood(mu=p) for p in points]
     plt.plot(points, y, label="likelihood")
     # Plot the histogram of samples
     plt.hist(mu_samples, 100, normed=1, facecolor='g', alpha=0.75, label="sampled")
