@@ -17,7 +17,6 @@ class Likelihood(object):
     _arg_list=[]
     _pdf=None
     _dataset=None
-    # Moved _likelihood_function to _pdf
     _integral_value=1.0
     _var_ranges = {}
     _cache = {}
@@ -33,11 +32,6 @@ class Likelihood(object):
         else:
             self.log.error("Cannot set range, param %s not found" % param)
             raise Exception("ParamNotFound")
-
-    #def ActivateLogging(level=logging.DEBUG):
-    #    FORMAT = "%(message)s"
-    #    logging.basicConfig(format=FORMAT)
-    #    logging.root.setLevel(logging.DEBUG)
 
     def setDataset(self, dataset):
         self._dataset=dataset
@@ -83,15 +77,27 @@ class Likelihood(object):
         self._pdf = pdf
 
 
+    '''
     def get_function_args(self):
         """ Return the kwargs for the callable
         based on the current state
+
         """
         function_args = {}
         for arg in self._arg_list:
             val = getattr(self, arg)
             function_args[arg] = val
         return function_args
+    '''
+
+    def get_state(self):
+        """ Get a dictionary represeting the current state
+
+        """
+        state = {}
+        for arg in self._arg_list:
+            state[arg] = getattr(self, arg)
+        return state        
 
 
     def set_state(self, **kwargs):
@@ -108,12 +114,6 @@ class Likelihood(object):
         return unused_args
 
 
-    def get_state(self):
-        state = {}
-        for arg in self._arg_list:
-            state[arg] = getattr(self, arg)
-        return state        
-
     def eval(self, data_point, **kwargs):
         """ 
         Evaluate the current state of the pdf
@@ -125,17 +125,16 @@ class Likelihood(object):
         self.set_state(**kwargs)
 
         # Get the value
-        func_args = self.get_function_args()
+        func_args = self.get_state()
         likelihood_val = self._pdf(data_point, **func_args)
 
-        self.check_value(likelihood_val)
+        self._check_value(likelihood_val)
 
         return likelihood_val
 
 
     def likelihood(self, **kwargs):
-        """ 
-        Get the current value of the likelihood
+        """ Get the current value of the likelihood
         based on the current state of the pdf
         and the internal dataset
 
@@ -148,12 +147,12 @@ class Likelihood(object):
         self.set_state(**kwargs)
 
         # Get the value
-        func_args = self.get_function_args()
+        func_args = self.get_state()
         likelihood_val = 1.0
         for point in self._dataset:
             likelihood_val *= self._pdf(point, **func_args)
             
-        self.check_value(likelihood_val)
+        self._check_value(likelihood_val)
         
         return likelihood_val
 
@@ -181,13 +180,12 @@ class Likelihood(object):
 
 
     def nll(self, **kwargs):
-        """
-        Return the log likelihood
-        This is a simple wrapper of the 'likelihood' method
+        """ Return the negative log likelihood
+        This is a simple extension of the 'loglikelihood' method
+
         """
         
         return -1*self.loglikelihood(**kwargs)
-
 
 
     def minimize(self, params, **kwargs):
@@ -209,7 +207,7 @@ class Likelihood(object):
         # Set the current state based on keyword args
         # This will effect the initial guess and any
         # constant parameters (non-minimized)
-        unused_params = self.set_state(**kwargs)
+        unused_kwargs = self.set_state(**kwargs)
 
         if len(params)==0:
             return
@@ -232,7 +230,7 @@ class Likelihood(object):
             self.log.debug("%s : %s" % (param, val))
 
         # Run the minimization
-        res = scipy.optimize.minimize(nnl_for_min, guess, **unused_params)
+        res = scipy.optimize.minimize(nnl_for_min, guess, **unused_kwargs)
         self.log.debug("Successfully Minimized:", res)
 
         #bounds = [self.bounds[param] for param in params]
@@ -250,6 +248,7 @@ class Likelihood(object):
 
     def profile(self, poi, nuisance, **kwargs):
         """ Return the profile likelihood as a function of the poi
+
         (parameter of interest), minimizing over the nuisance parameters
 
         return the nll of the profile likelihood
@@ -295,10 +294,9 @@ class Likelihood(object):
 
 
     def integral(self, data_point, param, range=None):
-        """ 
-        Return the integral of the pdf evaluated at the
-        given data point for a given parameter over the 
-        supplied (or stored) range.
+        """ Return the integral of the pdf 
+        The likelihood is evaluated at the given data point 
+        for a given parameter over the supplied (or stored) range.
 
         """
         
@@ -323,8 +321,7 @@ class Likelihood(object):
 
 
     def sample(self, params, nsamples=1, method='mc', **kwargs):
-        """
-        Generate sample points based on the given likelihood
+        """ Generate sample points based on the likelihood
 
         """
 
@@ -338,6 +335,7 @@ class Likelihood(object):
         else:
             print "Supplied invalid method for generate(): %s" % method
             raise Exception("generate")
+
 
     def sample_mcmc(self, params=[], nsamples=1, nwalkers=6):
         """
@@ -440,7 +438,10 @@ class Likelihood(object):
         return results
 
 
-    def check_value(self, val):
+    def _check_value(self, val):
+        """ An internal method to check that a likelihood val is acceptable
+
+        """
         if val <= 0.0:
             self.log.error("Error: Likelihood evaluated to < 0: ", val)
             raise Exception("LikelihoodEval")
