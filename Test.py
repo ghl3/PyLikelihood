@@ -28,6 +28,7 @@ def main():
 
     # Create the likelihood
     model = likelihood(pdf, data=d, params=[mu, mu0])
+    model.logging.setLevel(logging.DEBUG)
 
     print model
 
@@ -44,6 +45,11 @@ def main():
     model.eval(5)
     print model.norm
 
+
+    # Test the minimization
+    print "Fitting to data=7: "
+    model.fitTo( 7, params=["mu"])
+    pprint (vars(model))
     return
 
 

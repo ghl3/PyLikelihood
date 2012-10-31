@@ -4,6 +4,7 @@ from __future__ import division
 
 import inspect
 import logging
+logging.basicConfig()
 
 import scipy as sp
 import numpy as np
@@ -11,7 +12,9 @@ import matplotlib.pyplot as plt
 
 from scipy.stats import poisson
 from scipy.stats import norm
+
 from scipy import integrate
+from scipy import optimize
 
 from math import log
 
@@ -44,9 +47,11 @@ class likelihood(object):
     """
 
     # Create an internal logger
-    log = logging.getLogger()
+    logging = logging.getLogger("likelihood")
 
     def __init__(self, pdf, data=None, params=None):
+
+        # Set the pdf
         self.pdf = pdf
 
         # Use inspection to find all arguments of the pdf
@@ -288,6 +293,7 @@ class likelihood(object):
             return
 
         current_state = self.state()
+        self.normalize()
 
         # Create the function for minimization
         def nnl_for_min(param_values):
@@ -297,22 +303,24 @@ class likelihood(object):
 
             for (param, val) in zip(params, param_values):
                 setattr(self, param, val)
-            return self.nll(data)
+
+            # nll without normalization
+            return -1*log(self._eval_raw(data))
 
         # Get the initial guess
         guess = [getattr(self, param) for param in params]
-        self.log.debug("Minimizing: ")
+        self.logging.debug("Minimizing: ")
         for param, val in zip(params, guess):
-            self.log.debug("%s : %s" % (param, val))
+            self.logging.debug("%s : %s" % (param, val))
 
         # Run the minimization
-        res = scipy.optimize.minimize(nnl_for_min, guess)
-        self.log.debug("Successfully Minimized:", res)
+        res = optimize.minimize(nnl_for_min, guess)
+        self.logging.debug("Successfully Minimized:", res)
         
         # Set the values to the minimum
         min_values = res.x
         for (param, val) in zip(params, min_values):
-            self.log.debug("%s : %s" % (param, val))
+            self.logging.debug("%s : %s" % (param, val))
             setattr(self, param, val)
 
         return min
