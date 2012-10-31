@@ -63,7 +63,7 @@ class likelihood(object):
             print all_arguments
             raise Exception("InvalidDataVar")
         # And create an attribute for easy access
-        setattr(self, data.name, data)
+        setattr(self, data.name, data.val)
 
         # Get the list of parameters,
         # create variables based on them,
@@ -94,7 +94,7 @@ class likelihood(object):
             self.param_list.append(param_var)
             # And create an attribute for easy access
             print param_var, param_var.name
-            setattr(self, param_var.name, param_var)
+            setattr(self, param_var.name, param_var.val)
         
         self.norm = 1.0
         self.normalization_cache = {}
@@ -274,13 +274,15 @@ def main():
     print model.mu
     print model.mu0
 
-    model.mu.val = 5.0
-    model.mu0.val = 5.0
-    model.sigma.val = 1.0
+    model.mu = 5.0
+    model.mu0 = 5.0
+    model.sigma = 1.0
 
     print model.norm
     model.eval(5)
     print model.norm
+
+    return
 
     for point in range(0, 10):
         print point, ": ", model(point), ": ", model.eval(point)
