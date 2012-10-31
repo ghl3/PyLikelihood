@@ -249,26 +249,6 @@ class likelihood(object):
         return (min(mu_list), max(mu_list))
 
 
-'''
-# Create the likelihood
-likelihood.norm = 1.0
-#likelihood.cache = {}
-
-likelihood_int, err = integrate.quad(likelihood, -np.inf, np.inf) 
-likelihood.norm = 1.0 / likelihood_int
-print likelihood.norm
-
-def normalize(func, **kwargs):
-    def f(d):
-        return likelihood(d, **kwargs)
-    func.norm = 1.0
-    func_int, err = integrate.quad(f, -np.inf, np.inf) 
-    likelihood.norm = 1.0 / func_in
-'''
-
-
-# Do the Neyman Construction of a single variable
-
 def main():
 
     # Annoying boilerplate
@@ -327,39 +307,6 @@ def main():
     print "inverted Neyman 5.5: ", model.invert_neyman(5.5, neyman)
     print "inverted Neyman 6.0: ", model.invert_neyman(6.0, neyman)
     print "inverted Neyman 8.0: ", model.invert_neyman(8.0, neyman)
-
-    return
-
-    # Plot the likelihood as a function of data:
-    
-    data_var = variable("data", 0, 10, 100)
-    mu_var = variable("mu", 2.0, 8.0, 100)
-
-    data_meas = 5
-
-    make_plot(mu=7.39698)
-
-    # clear the current figure
-    plt.clf()
-
-    neyman = get_neyman(likelihood, 0.68, mu_var, data_var)
-    for pair in neyman:
-        #print pair
-        (mu, x0, x1) = pair[0], pair[1][0], pair[1][1]
-        plt.hlines(mu, x0, x1)
-
-    #print "inverted Neyman 3.0: ", invert_neyman(neyman, 3.0)
-
-    plt.xlabel('x')
-    plt.ylabel('mu')
-    plt.savefig("neyman.pdf")
-
-
-    # Build the confidence range for the data
-
-    # Build the Neyman Construction over the variable mu0
-
-
 
 
 if __name__=="__main__":
