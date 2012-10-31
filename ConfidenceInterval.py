@@ -262,7 +262,7 @@ class likelihood(object):
 
         return (min(mu_list), max(mu_list))
 
-
+'''
 def main():
 
     # Annoying boilerplate
@@ -336,3 +336,5 @@ def main():
 
 if __name__=="__main__":
     main()
+
+'''
