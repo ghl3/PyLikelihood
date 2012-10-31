@@ -24,7 +24,7 @@ class variable(object):
         self.min = var_min
         self.max = var_max
         self.num_points = num_points
-        self.val = 0.0
+        #self.val = 0.0
 
     def linspace(self):
         return np.linspace(self.min, self.max, self.num_points)
@@ -63,7 +63,7 @@ class likelihood(object):
             print all_arguments
             raise Exception("InvalidDataVar")
         # And create an attribute for easy access
-        setattr(self, data.name, data.val)
+        setattr(self, data.name, 0.0)
 
         # Get the list of parameters,
         # create variables based on them,
@@ -94,7 +94,7 @@ class likelihood(object):
             self.param_list.append(param_var)
             # And create an attribute for easy access
             print param_var, param_var.name
-            setattr(self, param_var.name, param_var.val)
+            setattr(self, param_var.name, 0.0)
         
         self.norm = 1.0
         self.normalization_cache = {}
@@ -107,7 +107,7 @@ class likelihood(object):
         current_state = {}
         #current_state[self.data.name] = self.data.val
         for param in self.param_list:
-            current_state[param.name] = param.val
+            current_state[param.name] = getattr(self, param.name)
         return current_state
 
 
@@ -204,7 +204,7 @@ class likelihood(object):
         
         interval_list = []
         for param_point in param_var.linspace():
-            param_var.val = param_point
+            setattr(self, param_var.name, param_point)
             interval = self.get_interval(percentage)
             interval_list.append( (param_point, interval) )
 
