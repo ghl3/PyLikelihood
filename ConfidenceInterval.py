@@ -49,6 +49,11 @@ class likelihood(object):
         func_spec = inspect.getargspec(self.pdf)
         (all_arguments, all_defaults) = (func_spec.args, func_spec.defaults)
 
+        # Get the defaults for any arguments that have them
+        default_dict = {}
+        for name, val in zip( reversed(all_arguments), reversed(all_defaults) ):
+            default_dict[name] = val
+
         # Determine the data var and save an internal 'variable'
         # If none is supplied, assume it's the 0th argument
         # If a string is supplied, create a new variable
@@ -62,8 +67,12 @@ class likelihood(object):
             print "Error: Supplied data var is not an argument of the supplied pdf",
             print all_arguments
             raise Exception("InvalidDataVar")
+
         # And create an attribute for easy access
-        setattr(self, data.name, 0.0)
+        if data.name in default_dict:
+            setattr(self, data.name, default_dict[data.name])
+        else:
+            setattr(self, data.name, 0.0)
 
         # Get the list of parameters,
         # create variables based on them,
@@ -94,7 +103,12 @@ class likelihood(object):
             self.param_list.append(param_var)
             # And create an attribute for easy access
             print param_var, param_var.name
-            setattr(self, param_var.name, 0.0)
+
+            # And create an attribute for easy access
+            if param_var.name in default_dict:
+                setattr(self, param_var.name, default_dict[param_var.name])
+            else:
+                setattr(self, param_var.name, 0.0)
         
         self.norm = 1.0
         self.normalization_cache = {}
@@ -264,6 +278,13 @@ def main():
     def pdf(d, mu=5.0, mu0=5.0, sigma=2.0):
         return gauss(d, mu, 2.0)*gauss(mu0, mu, sigma)
 
+
+    #func_spec = inspect.getargspec(pdf)
+    #(all_arguments, all_defaults) = (func_spec.args, func_spec.defaults)
+    #print "Spec: ", func_spec
+    #print "Arguments: ", all_arguments
+    #print "Defaults: ", all_defaults
+
     # Create the likelihood
     model = likelihood(pdf, data=d, params=[mu, mu0])
 
@@ -276,13 +297,15 @@ def main():
 
     model.mu = 5.0
     model.mu0 = 5.0
-    model.sigma = 1.0
+    #model.sigma = 1.0
 
     print model.norm
     model.eval(5)
     print model.norm
 
     return
+
+
 
     for point in range(0, 10):
         print point, ": ", model(point), ": ", model.eval(point)
