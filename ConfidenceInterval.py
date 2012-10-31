@@ -134,21 +134,40 @@ class likelihood(object):
         return current_state
 
 
-    def _eval_raw(self, x):
+    def set_state(self, **kwargs):
+        """ Set the state based on the values of the arguments
+
+        Return any args that aren't parameters of the likelihood
+        """
+
+        for (arg, val) in kwargs.iteritems():
+            if hasattr(self, arg):
+                setattr(self, arg, val)
+            else:
+                print "Error: Cannot set state argument: ", arg,
+                print " in likelihood, it does not exist"
+                raise Exception("SetState")
+            pass
+        return
+
+
+    def _eval_raw(self, x, **kwargs):
         """ Get the current state of the likelihood
         without any normalization
 
         """
+        self.set_state(**kwargs)
         current_state = self.state()
         return self.pdf(x, **current_state)
         
 
-    def eval(self, x):
+    def eval(self, x, **kwargs):
         """ Val of pdf based on the current state,
         Evaluated on the given data point
         This includes normalization, which is cached
 
         """
+        self.set_state(**kwargs)
         self.normalize()
         return self._eval_raw(x)*self.norm 
 
@@ -170,7 +189,7 @@ class likelihood(object):
         # If not, integrate over the data, invert it, 
         # and store the cache
         data_min, data_max = (self.data.min, self.data.max)
-        print "Integrating: ", self.state()
+        self.logging.debug("Integrating: " + str( self.state()))
         integral, err = integrate.quad(self._eval_raw, data_min, data_max) 
         self.norm = 1.0 / integral
         self.normalization_cache[param_state] = self.norm
@@ -288,8 +307,14 @@ class likelihood(object):
 
         """
 
+        # Log
+        print "Minimizing: ", params
+        #self.logging.debug("Minimizing: " + str(params))
+        
         # Minimize the supplied params
         if len(params)==0:
+            print "Error: No Paramaterize to Minimize"
+            raise Exception("FitTo")
             return
 
         current_state = self.state()
@@ -325,6 +350,50 @@ class likelihood(object):
 
         return min
 
+
+    def profile(self, data, poi, nuisance, **kwargs):
+        """ Return the profile likelihood as a function of the poi
+
+        (parameter of interest), minimizing over the nuisance parameters
+
+        return the nll of the profile likelihood
+        """
+
+        self.set_state(**kwargs)
+
+        # Save the current value since we are evaluating
+        # the profile likelihood at this point
+        current_poi_value = getattr(self, poi)
+
+        # Get the set of parameters
+        all_params = [poi]
+        all_params.extend(nuisance)
+        self.logging.debug( "All Params: %s" % all_params)
+
+        # Get the constant parameters
+        '''
+        const_params = []
+        for param in self._arg_list:
+            if param == poi: continue
+            if param in nuisance: continue
+            const_params.append( (param, getattr(self, param)) )
+        const_params = tuple(const_params)
+        '''
+
+        # Get the global min
+        self.fitTo(data, params=all_params)
+        global_nll = self.nll(data)
+        
+        #    self._cache[const_params] = global_nll
+        #else:
+        #    global_nll = self._cache[const_params]
+
+        # Get the local min at this point
+        setattr(self, poi, current_poi_value)
+        self.fitTo(data, params=nuisance)
+        local_nll = self.nll(data)
+
+        return local_nll - global_nll
 
 
 '''

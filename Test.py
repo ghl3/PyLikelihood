@@ -48,8 +48,39 @@ def main():
 
     # Test the minimization
     print "Fitting to data=7: "
-    model.fitTo( 7, params=["mu"])
+    obs_data = 7
+
+    model.fitTo( obs_data, params=["mu"])
+    nll_local_min = model.nll(obs_data)
+
+    model.fitTo( obs_data, params=["mu","mu0"])
+    nll_global_min = model.nll(obs_data)
+
+
+    profile_min = model.profile(obs_data, "mu", nuisance=["mu0"])
+    print "nll_local_min: ", nll_local_min, "nll_global_min: ", nll_global_min, 
+    print " profile min: ", profile_min
+    return
+
+    '''
     pprint (vars(model))
+    prof = model.profile(7, "mu", 
+    print "Profile: ", prof
+    pprint (vars(model))
+    '''
+
+    plt.clf()
+    x = model.data.linspace()
+    y = [model.nll(obs_data, mu=d) - nll_min for d in x]
+    plt.plot(x,y)
+
+    y = [model.profile(obs_data, poi="mu", mu=d, nuisance=["mu0"], ) for d in x]
+    plt.plot(x,y)
+
+    plt.xlabel('mu')
+    plt.ylabel('profile likelihood(x)')
+    plt.savefig("profile.pdf")
+    # RETURN
     return
 
 
