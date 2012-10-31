@@ -23,12 +23,35 @@ class variable:
         return np.linspace(self.min, self.max, self.num_points)
     pass
 
+
+class likelihood:
+    def __init__(self, func, data_var):
+        self.func = func
+        self.data_var = data_var
+
+        # Get the list of parameters
+        func_spec = inspect.getargspec(pdf)
+        self.param_list = [arg for arg in func_spec.args if arg != data_var]
+        
+    def normalize():
+    
+   def eval(x):
+       
+
+
+        self.max = max
+        self.num_points = num_points
+    
+
 # Annoying boilerplate
 def pois(x, mu):
     return poisson.pmf(x, mu)
 
 def gauss(x, mu, sigma):
     return norm.pdf(x, mu, sigma)
+
+
+
 
 # Create the likelihood
 def likelihood(d, mu=5.0, mu0=5.0, sigma=2.0):
