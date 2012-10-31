@@ -3,6 +3,7 @@
 from __future__ import division
 
 import inspect
+import logging
 
 import scipy as sp
 import numpy as np
@@ -41,6 +42,9 @@ class likelihood(object):
     (which then give those arguments min, max and num_points)
     
     """
+
+    # Create an internal logger
+    log = logging.getLogger()
 
     def __init__(self, pdf, data=None, params=None):
         self.pdf = pdf
@@ -261,6 +265,59 @@ class likelihood(object):
             pass
 
         return (min(mu_list), max(mu_list))
+
+
+    def fitTo(self, data, params, **kwargs):
+        """ Minmize the supplied parameters based on the nll
+
+        Set the values of the minimized parameters in the
+        likelihood's 'state'.  Use any keyword arguments as
+        initial values to parameters, or for any other
+        (non-minimized) parameters in the model
+
+        TO DO: Split the kwargs into args for the nll
+        and args for optimize.minimize, and throw
+        exceptions for all others
+        (Should also warn about argument clashes with
+        optimize when the likelihood function is initialized...)
+
+        """
+
+        # Minimize the supplied params
+        if len(params)==0:
+            return
+
+        current_state = self.state()
+
+        # Create the function for minimization
+        def nnl_for_min(param_values):
+            """ Create the wrapper function for scipy.optimize
+
+            """
+
+            for (param, val) in zip(params, param_values):
+                setattr(self, param, val)
+            return self.nll(data)
+
+        # Get the initial guess
+        guess = [getattr(self, param) for param in params]
+        self.log.debug("Minimizing: ")
+        for param, val in zip(params, guess):
+            self.log.debug("%s : %s" % (param, val))
+
+        # Run the minimization
+        res = scipy.optimize.minimize(nnl_for_min, guess)
+        self.log.debug("Successfully Minimized:", res)
+        
+        # Set the values to the minimum
+        min_values = res.x
+        for (param, val) in zip(params, min_values):
+            self.log.debug("%s : %s" % (param, val))
+            setattr(self, param, val)
+
+        return min
+
+
 
 '''
 def main():
