@@ -110,15 +110,6 @@ class likelihood(object):
             current_state[param.name] = param.val
         return current_state
 
-    '''
-    def param_state(self):
-        current_state = self.state()
-        param_state = {}
-        for key, val in current_state.iteritems():
-            if key == self.data.name: continue
-            param_state[key] = val
-        return param_state
-    '''
 
     def _eval_raw(self, x):
         """ Get the current state of the likelihood
@@ -177,6 +168,87 @@ class likelihood(object):
     def nll(self, *args, **kwargs):
         return -1*self.loglikelihood(*args, **kwargs)
 
+    
+    def get_interval(self, percentage):
+        """ Get an inverval over the data parameter 
+        which contains 'percentage' of the probability
+        
+        """
+        points = self.data.linspace()
+        pair_list = zip(points, map(self.eval, points))
+
+        # ordering rule is maximum likelihood
+        # sort by descending in likelihood
+        pair_list = sorted(pair_list, key=lambda pair: pair[1], reverse=True)
+
+        delta = (self.data.max - self.data.min) / self.data.num_points
+        
+        total_likelihood = 0.0
+        accepted_point_list = []
+        for (point, likelihood) in pair_list:
+            accepted_point_list.append(point)
+            total_likelihood += likelihood*delta
+            if total_likelihood >= percentage: break
+        
+        interval = (min(accepted_point_list), max(accepted_point_list))
+        return interval
+
+
+    def get_neyman(self, percentage, param):
+        """ Create a list of intervals
+        for the parameter 'param'
+
+        """
+
+        param_var = getattr(self, param)
+        
+        interval_list = []
+        for param_point in param_var.linspace():
+            param_var.val = param_point
+            interval = self.get_interval(percentage)
+            interval_list.append( (param_point, interval) )
+
+        return interval_list
+
+
+    def make_plot(self, interval=None):
+        """ Plot the likelihood over data
+        """
+        x = self.data.linspace()
+        y = map(self.eval, x)
+        plt.plot(x,y)
+        plt.xlabel('x')
+        plt.ylabel('likelihood(x)')
+        x1,x2,y1,y2 = plt.axis()
+
+        if interval != None:
+            interval = self.get_interval(interval)
+            plt.vlines(interval[0], y1, y2)
+            plt.vlines(interval[1], y1, y2)
+
+        return
+
+
+    def invert_neyman(self, data_point, neyman=None, percentage=None, param=None):
+        """ Invert neyman to get confidence interval
+        
+        The Neyman list looks like: [ (mu, (d0, d1)), ...
+        """
+        
+        mu_list = []
+        
+        if neyman==None:
+            neyman = self.get_neyman(percentage, param)
+
+        for item in neyman:
+            (mu, (d0, d1)) = item
+            if d0 <= data_point and data_point <= d1:
+                mu_list.append(mu)
+            pass
+
+        return (min(mu_list), max(mu_list))
+
+
 '''
 # Create the likelihood
 likelihood.norm = 1.0
@@ -185,98 +257,17 @@ likelihood.norm = 1.0
 likelihood_int, err = integrate.quad(likelihood, -np.inf, np.inf) 
 likelihood.norm = 1.0 / likelihood_int
 print likelihood.norm
-'''
 
 def normalize(func, **kwargs):
     def f(d):
         return likelihood(d, **kwargs)
     func.norm = 1.0
     func_int, err = integrate.quad(f, -np.inf, np.inf) 
-    likelihood.norm = 1.0 / func_int
-
-
-def get_interval(func, percentage, start, stop, num_points=2000):
-    points = np.linspace(start, stop, num_points)
-    pair_list = zip(points, map(func, points))
-
-    # ordering rule is maximum likelihood
-    # sort by descending in likelihood
-    pair_list = sorted(pair_list, key=lambda pair: pair[1], reverse=True)
-
-    delta = (stop-start) / num_points
-
-    total_likelihood = 0.0
-    accepted_point_list = []
-    for pair in pair_list:
-        accepted_point_list.append(pair[0])
-        total_likelihood += pair[1]*delta
-        #print "Point: ", pair[0], " Likelihood: ", pair[1], " Probability: ", pair[1]*delta, " Total Likelihood", total_likelihood
-        if total_likelihood >= percentage: break
-        
-    interval = (min(accepted_point_list), max(accepted_point_list))
-    return interval
+    likelihood.norm = 1.0 / func_in
+'''
 
 
 # Do the Neyman Construction of a single variable
-def get_neyman(func, percentage, param, data):
-
-    interval_list = []
-
-    for param_point in param.linspace():
-
-        def f(d):
-            return likelihood(d, **{param.name:param_point})
-        likelihood.norm = 1.0
-        func_int, err = integrate.quad(f, -np.inf, np.inf) 
-        likelihood.norm = 1.0 / func_int
-        #f = lambda d: 
-        likelihood.normalization = 1.0 / integrate.quad(f, -np.inf, np.inf )[0]
-        interval = get_interval(f, percentage, data.min, data.max, data.num_points)
-        interval_list.append((param_point, interval))
-
-    return interval_list
-
-
-def invert_neyman(interval_list, data_point):
-    """ Invert neyman to get confidence interval
-
-    The Neyman list looks like: [ (mu, (d0, d1)), ...
-    """
-    
-    mu_list = []
-
-    for item in interval_list:
-        (mu, (d0, d1)) = item
-        if d0 <= data_point and data_point <= d1:
-            mu_list.append(mu)
-        pass
-
-    return (min(mu_list), max(mu_list))
-
-
-
-def make_plot(mu):
-    x = np.linspace(0, 20, 1000) # 100 linearly spaced numbers
-    y = [likelihood(d, mu) for d in x]
-    plt.plot(x,y)    
-    x1,x2,y1,y2 = plt.axis()
-    def f(d):
-        return likelihood(d, **{"mu":mu})
-    likelihood.norm = 1.0
-    func_int, err = integrate.quad(f, -np.inf, np.inf) 
-    likelihood.norm = 1.0 / func_int
-    #likelihood.norm = 1.0
-    #likelihood_int, err = integrate.quad(f, -np.inf, np.inf) 
-    #likelihood.norm = 1.0 / likelihood_int
-    interval = get_interval(f, .68, start=0.0, stop=20.0)
-    #print "Interval: ", interval
-    plt.vlines(interval[0], y1, y2)
-    plt.vlines(interval[1], y1, y2)
-    plt.xlabel('x')
-    plt.ylabel('likelihood(x)')
-    plt.savefig("plot.pdf")
-
-
 
 def main():
 
@@ -306,7 +297,6 @@ def main():
     model.mu.val = 5.0
     model.mu0.val = 5.0
     model.sigma.val = 1.0
-    
 
     print model.norm
     model.eval(5)
@@ -315,13 +305,32 @@ def main():
     for point in range(0, 10):
         print point, ": ", model(point), ": ", model.eval(point)
 
+    print model.get_interval(0.68)
+
+    model.make_plot(interval=0.68)
+    plt.savefig("plot.pdf")
+
+    # clear the current figure and
+    # plot the neyman interval
+    plt.clf()
+    neyman = model.get_neyman(0.68, "mu")
+    for pair in neyman:
+        #print pair
+        (mu, x0, x1) = pair[0], pair[1][0], pair[1][1]
+        plt.hlines(mu, x0, x1)
+    plt.xlabel('x')
+    plt.ylabel('mu')
+    plt.savefig("neyman.pdf")
+
+    print "inverted Neyman 4.5: ", model.invert_neyman(4.5, neyman)
+    print "inverted Neyman 5.0: ", model.invert_neyman(5.0, neyman)
+    print "inverted Neyman 5.5: ", model.invert_neyman(5.5, neyman)
+    print "inverted Neyman 6.0: ", model.invert_neyman(6.0, neyman)
+    print "inverted Neyman 8.0: ", model.invert_neyman(8.0, neyman)
+
     return
 
     # Plot the likelihood as a function of data:
-
-
-
-
     
     data_var = variable("data", 0, 10, 100)
     mu_var = variable("mu", 2.0, 8.0, 100)
@@ -340,11 +349,6 @@ def main():
         plt.hlines(mu, x0, x1)
 
     #print "inverted Neyman 3.0: ", invert_neyman(neyman, 3.0)
-    print "inverted Neyman 4.5: ", invert_neyman(neyman, 4.5)
-    print "inverted Neyman 5.0: ", invert_neyman(neyman, 5.0)
-    print "inverted Neyman 5.5: ", invert_neyman(neyman, 5.5)
-    print "inverted Neyman 6.0: ", invert_neyman(neyman, 6.0)
-    print "inverted Neyman 8.0: ", invert_neyman(neyman, 8.0)
 
     plt.xlabel('x')
     plt.ylabel('mu')
