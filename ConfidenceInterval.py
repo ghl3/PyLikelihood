@@ -47,8 +47,15 @@ def loglikelihood(*args, **kwargs):
 def nll(*args, **kwargs):
     return -1*loglikelihood(*args, **kwargs)
 
+def normalize(func, **kwargs):
+    def f(d):
+        return likelihood(d, **kwargs)
+    func.norm = 1.0
+    func_int, err = integrate.quad(f, -np.inf, np.inf) 
+    likelihood.norm = 1.0 / func_int
 
-def get_interval(func, percentage, start, stop, num_points=1000):
+
+def get_interval(func, percentage, start, stop, num_points=2000):
     points = np.linspace(start, stop, num_points)
     pair_list = zip(points, map(func, points))
 
@@ -63,7 +70,7 @@ def get_interval(func, percentage, start, stop, num_points=1000):
     for pair in pair_list:
         accepted_point_list.append(pair[0])
         total_likelihood += pair[1]*delta
-        # print "Point: ", pair[0], " Likelihood: ", pair[1], " Probability: ", pair[1]*delta, " Total Likelihood", total_likelihood
+        #print "Point: ", pair[0], " Likelihood: ", pair[1], " Probability: ", pair[1]*delta, " Total Likelihood", total_likelihood
         if total_likelihood >= percentage: break
         
     interval = (min(accepted_point_list), max(accepted_point_list))
@@ -78,9 +85,12 @@ def get_neyman(func, percentage, param, data):
     for param_point in param.linspace():
 
         def f(d):
-            return func(d, **{param.name:param_point})
+            return likelihood(d, **{param.name:param_point})
+        likelihood.norm = 1.0
+        func_int, err = integrate.quad(f, -np.inf, np.inf) 
+        likelihood.norm = 1.0 / func_int
         #f = lambda d: 
-        func.normalization = 1.0 / integrate.quad(f, -np.inf, np.inf )[0]
+        likelihood.normalization = 1.0 / integrate.quad(f, -np.inf, np.inf )[0]
         interval = get_interval(f, percentage, data.min, data.max, data.num_points)
         interval_list.append((param_point, interval))
 
@@ -103,36 +113,48 @@ def invert_neyman(interval_list, data_point):
 
     return (min(mu_list), max(mu_list))
 
+
+
+def make_plot(mu):
+    x = np.linspace(0, 20, 1000) # 100 linearly spaced numbers
+    y = [likelihood(d, mu) for d in x]
+    plt.plot(x,y)    
+    x1,x2,y1,y2 = plt.axis()
+    def f(d):
+        return likelihood(d, **{"mu":mu})
+    likelihood.norm = 1.0
+    func_int, err = integrate.quad(f, -np.inf, np.inf) 
+    likelihood.norm = 1.0 / func_int
+    #likelihood.norm = 1.0
+    #likelihood_int, err = integrate.quad(f, -np.inf, np.inf) 
+    #likelihood.norm = 1.0 / likelihood_int
+    interval = get_interval(f, .68, start=0.0, stop=20.0)
+    #print "Interval: ", interval
+    plt.vlines(interval[0], y1, y2)
+    plt.vlines(interval[1], y1, y2)
+    plt.xlabel('x')
+    plt.ylabel('likelihood(x)')
+    plt.savefig("plot.pdf")
+
+
+
 def main():
 
     # Plot the likelihood as a function of data:
     
-    data_var = variable("data", 0, 10, 300)
-    mu_var = variable("mu", 4.0, 6.0, 200)
+    data_var = variable("data", 0, 10, 100)
+    mu_var = variable("mu", 2.0, 8.0, 100)
 
     data_meas = 5
-    x = np.linspace(0, 10, 1000) # 100 linearly spaced numbers
-    y = [likelihood(data_meas, mu) for mu in x]
-    #for(mu, lk) in zip(x, y):
-    #    print "x: %s pois: %s gauss: %s total: %s" % (mu, pois(data, mu), gauss(data, mu, 1.0), lk )
 
-    interval = get_interval(likelihood, .68, start=0.0, stop=10.0)
-    print "Interval: ", interval
-        
-    plt.plot(x,y)
-    x1,x2,y1,y2 = plt.axis()
-
-    plt.vlines(interval[0], y1, y2)
-    plt.vlines(interval[1], y1, y2)
-    #plt.show()
-    plt.savefig("plot.pdf")
+    make_plot(mu=7.39698)
 
     # clear the current figure
     plt.clf()
 
     neyman = get_neyman(likelihood, 0.68, mu_var, data_var)
     for pair in neyman:
-        print pair
+        #print pair
         (mu, x0, x1) = pair[0], pair[1][0], pair[1][1]
         plt.hlines(mu, x0, x1)
 
