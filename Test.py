@@ -51,7 +51,7 @@ def test_minimization(model, obs_data):
     print "Fitting to data=10: "
     #obs_data = 10
     model.fitTo(obs_data, params=["s", "b"])
-    nll_min = model.nll(obs_data)
+    nll_min = model.nll(d=obs_data)
 
 
 def test_profile(model, obs_data):
@@ -60,8 +60,8 @@ def test_profile(model, obs_data):
 
     # Testing the profile
     model.fitTo(obs_data, params=["s", "b"])
-    nll_min = model.nll(obs_data)
-    profile_min = model.profile(obs_data, "s", nuisance=["b"])
+    nll_min = model.nll(d=obs_data)
+    profile_min = model.profile(d=obs_data, poi="s", nuisance=["b"])
     print "nll_min: ", nll_min
     print " profile min: ", profile_min
 
@@ -70,12 +70,12 @@ def test_profile(model, obs_data):
 
     # Draw Nll
     model.fitTo(obs_data, params=["s", "b"])
-    y = [model.nll(obs_data, s=d) - nll_min for d in x]
+    y = [model.nll(d=obs_data, s=sig) - nll_min for sig in x]
     plt.plot(x,y)
 
     # Draw profile nll
     model.fitTo(obs_data, params=["s", "b"])
-    z = [model.profile(obs_data, poi="s", s=d, nuisance=["b"], ) for d in x]
+    z = [model.profile(d=obs_data, poi="s", s=sig, nuisance=["b"], ) for sig in x]
     plt.plot(x,z)
 
     (ymin, ymax) = plt.ylim()
@@ -119,10 +119,12 @@ def test_interval(model, obs_data):
 
 def test_mc(model, obs_data):
 
-    model.fitTo(params=["s", "b"], d=obs_data)
+    model.fitTo(obs_data, params=["s", "b"])
     samples = model.sample_mc(['d'], 1000)
     values = [point['d'] for point in samples]
-    print values
+    #print values
+
+    # Plot the sampled values
     n, bins, patches = plt.hist(values, 20, normed=1, facecolor='g')
     plt.xlabel('data')
     plt.ylabel('Probability')
@@ -139,5 +141,5 @@ if __name__=="__main__":
 
     #test_minimization(model, obs_data)
     #test_profile(model, obs_data)
-    #test_interval(model, obs_data)
+    test_interval(model, obs_data)
     test_mc(model, obs_data)

@@ -191,6 +191,11 @@ class likelihood(object):
         return self._eval_raw()*self.norm 
 
 
+    def evalData(self, data):
+        self.set_data(data)
+        return self.eval()
+
+
     def normalize(self):
         """ Integrate over the data
         at the current parameter point
@@ -241,7 +246,7 @@ class likelihood(object):
         
         """
         points = self.data.linspace()
-        pair_list = zip(points, map(self.eval, points))
+        pair_list = zip(points, map(self.evalData, points))
 
         # ordering rule is maximum likelihood
         # sort by descending in likelihood
@@ -280,8 +285,13 @@ class likelihood(object):
     def make_plot(self, interval=None):
         """ Plot the likelihood over data
         """
+
+        def eval_data(data):
+            self.set_data(data)
+            return self.eval()
+
         x = self.data.linspace()
-        y = map(self.eval, x)
+        y = map(eval_data, x)
         plt.plot(x,y)
         plt.xlabel('x')
         plt.ylabel('likelihood(x)')
@@ -295,7 +305,7 @@ class likelihood(object):
         return
 
 
-    def invert_neyman(self, neyman=None, percentage=None, param=None, **kwargs):
+    def invert_neyman(self, data, neyman=None, percentage=None, param=None, **kwargs):
         """ Invert neyman to get confidence interval
         
         The Neyman list looks like: [ (mu, (d0, d1)), ...
@@ -308,7 +318,7 @@ class likelihood(object):
 
         for item in neyman:
             (mu, (d0, d1)) = item
-            if d0 <= self.get_data() and self.get_data() <= d1:
+            if d0 <= data and data <= d1:
                 mu_list.append(mu)
             pass
         
@@ -318,7 +328,7 @@ class likelihood(object):
         return (min(mu_list), max(mu_list))
 
 
-    def fitTo(self, params, **kwargs):
+    def fitTo(self, data, params, **kwargs):
         """ Minmize the supplied parameters based on the nll
 
         Set the values of the minimized parameters in the
@@ -426,7 +436,7 @@ class likelihood(object):
         if cache_key in self.nll_cache:
             global_nll = self.nll_cache[cache_key]
         else:
-            self.fitTo(data, params=all_params)
+            self.fitTo(self.get_data(), params=all_params)
             global_nll = self.nll()
             self.nll_cache[cache_key] = global_nll
         
@@ -497,7 +507,7 @@ class likelihood(object):
                     param_var = self.args[param] #param_dict[param]
                     #(param_min, param_max) = (param_var.
                     val = random.uniform(param_var.min, param_var.max)
-                    print "Setting attribute: %s %s" % (param, val)
+                    self.logging.debug("Setting attribute: %s %s" % (param, val))
                     setattr(self, param, val)
             
                 # Get the likelihood
@@ -506,11 +516,14 @@ class likelihood(object):
                 # Throw the Monte-Carlo dice:
                 mc_val = random.uniform(0.0, 1.0)
 
-                print "MC Accept/Reject: ",
-                print " state: ", str(self.state().update( \
-                        {self.data.name: getattr(self, self.data.name)})),
-                print " likelihood: ", lhood
-                print " mc_val: ", mc_val
+                debug_string =  "MC Accept/Reject: "
+                total_state = self.state()
+                total_state.update({self.data.name: getattr(self, self.data.name)})
+                debug_string += " state: " + str(total_state)
+                debug_string += " likelihood: %s" % lhood
+                debug_string += " mc_val: %s" % mc_val
+                self.logging.debug(debug_string)
+                
                 if lhood > mc_val: break
 
             point = {}
@@ -521,7 +534,6 @@ class likelihood(object):
 
         self.set_state(**saved_state)
         return results
-
 
 
     def sample_mcmc(self, params=[], nsamples=1, nwalkers=6):
