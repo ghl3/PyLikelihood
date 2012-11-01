@@ -5,7 +5,7 @@ from ConfidenceInterval import *
 
 import math
 
-def main():
+def create_model():
 
     # Annoying boilerplate
     def pois(x, mu):
@@ -25,6 +25,11 @@ def main():
     model = likelihood(pdf, data=d, params=[s, b])
     model.logging.setLevel(logging.DEBUG)
 
+    return model
+
+
+def print_model(model):
+
     # Print the model
     print model
     from pprint import pprint
@@ -39,38 +44,36 @@ def main():
     model.eval(5)
     print model.norm
 
+
+def test_minimization(model, obs_data):
+
     # Test the minimization
     print "Fitting to data=10: "
-    obs_data = 10
+    #obs_data = 10
     model.fitTo(obs_data, params=["s", "b"])
     nll_min = model.nll(obs_data)
 
+
+def test_profile(model, obs_data):
+
+    plt.clf()
+
     # Testing the profile
+    model.fitTo(obs_data, params=["s", "b"])
+    nll_min = model.nll(obs_data)
     profile_min = model.profile(obs_data, "s", nuisance=["b"])
     print "nll_min: ", nll_min
     print " profile min: ", profile_min
 
-
-    '''
-    pprint (vars(model))
-    prof = model.profile(7, "mu", 
-    print "Profile: ", prof
-    pprint (vars(model))
-    '''
-
-    plt.clf()
+    # create the x values
     x = model.data.linspace()
 
-    # Likelihood
-    '''
+    # Draw Nll
     model.fitTo(obs_data, params=["s", "b"])
     y = [model.nll(obs_data, s=d) - nll_min for d in x]
     plt.plot(x,y)
-    plt.clf()
-    '''
 
-    '''
-    # Profile Likelihood
+    # Draw profile nll
     model.fitTo(obs_data, params=["s", "b"])
     z = [model.profile(obs_data, poi="s", s=d, nuisance=["b"], ) for d in x]
     plt.plot(x,z)
@@ -83,7 +86,11 @@ def main():
     plt.xlabel('mu')
     plt.ylabel('profile likelihood(x)')
     plt.savefig("profile.pdf")
-    '''
+
+    plt.clf()
+
+
+def test_interval(model, obs_data):
 
     # Test the interval functionality (over data)
     plt.clf()
@@ -103,12 +110,19 @@ def main():
     plt.ylabel('s')
     plt.savefig("neyman.pdf")
 
-    print "inverted Neyman 4: ", model.invert_neyman(4, neyman)
-    print "inverted Neyman 5: ", model.invert_neyman(5, neyman)
-    print "inverted Neyman 6: ", model.invert_neyman(6, neyman)
-    print "inverted Neyman 7: ", model.invert_neyman(7, neyman)
-    print "inverted Neyman 8: ", model.invert_neyman(8, neyman)
+    #print "inverted Neyman 4: ", model.invert_neyman(4, neyman)
+    print "inverted Neyman 8: ",  model.invert_neyman(8, neyman)
+    print "inverted Neyman 10: ", model.invert_neyman(10, neyman)
+    print "inverted Neyman 12: ", model.invert_neyman(12, neyman)
+    print "inverted Neyman 14: ", model.invert_neyman(14, neyman)
 
 
 if __name__=="__main__":
-    main()
+    model = create_model()
+    #print_model(model)
+
+    obs_data = 7
+
+    #test_minimization(model, obs_data)
+    #test_profile(model, obs_data)
+    test_interval(model, obs_data)
