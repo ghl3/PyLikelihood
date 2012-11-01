@@ -86,9 +86,8 @@ class likelihood(object):
         # Get the list of parameters,
         # create variables based on them,
         # and store that list of variables
-        self.param_list = []
+        self.param_dict = {}
         param_list = [arg for arg in func_spec.args if arg != self.data.name]
-        print "Param List: ", param_list 
         for param in param_list:
 
             # Check if the parameter matches one in the
@@ -98,7 +97,7 @@ class likelihood(object):
             param_var = None
 
             if len(matching_var_list)==0:
-                print "Creating new param with name: ", param
+                self.logging.debug("Creating new param with name: " + param)
                 param_var = variable(param)
                 # If the parameter has a default in the function definition,
                 # Set that default here
@@ -109,9 +108,7 @@ class likelihood(object):
                 print "Error: More than one parameter variable supplied ",
                 print "with the name: ", param
                 raise Exception("ParamVariable")
-            self.param_list.append(param_var)
-            # And create an attribute for easy access
-            print param_var, param_var.name
+            self.param_dict[param_var.name] = param_var
 
             # And create an attribute for easy access
             if param_var.name in default_dict:
@@ -121,6 +118,8 @@ class likelihood(object):
         
         self.norm = 1.0
         self.normalization_cache = {}
+        self.minimization_cache = {}
+        self.nll_cache = {}
 
 
     def state(self):
@@ -129,7 +128,7 @@ class likelihood(object):
         """
         current_state = {}
         #current_state[self.data.name] = self.data.val
-        for param in self.param_list:
+        for name, param in self.param_dict.iteritems():
             current_state[param.name] = getattr(self, param.name)
         return current_state
 
@@ -242,11 +241,11 @@ class likelihood(object):
 
         """
 
-        param_var = getattr(self, param)
+        param_var = self.param_dict[param] #getattr(self, param)
         
         interval_list = []
         for param_point in param_var.linspace():
-            setattr(self, param_var.name, param_point)
+            setattr(self, param, param_point)
             interval = self.get_interval(percentage)
             interval_list.append( (param_point, interval) )
 
@@ -287,6 +286,9 @@ class likelihood(object):
             if d0 <= data_point and data_point <= d1:
                 mu_list.append(mu)
             pass
+        
+        if len(mu_list)==0:
+            print "Error: No acceptable values of param found"
 
         return (min(mu_list), max(mu_list))
 
@@ -308,9 +310,18 @@ class likelihood(object):
         """
 
         # Log
-        print "Minimizing: ", params
-        #self.logging.debug("Minimizing: " + str(params))
-        
+        self.logging.debug( "Minimizing: " + str(params))
+
+        # NOT YET IMPLEMENTED
+        # Create a key based on the values of the params to not minimize
+        # and the list of params to minimize (possibly overkill, but whatevs)
+        constant_params = [item for item in self.state().items() if item[0] not in params]
+        cache_key = (hash(frozenset(constant_params)), hash(frozenset(params)))
+        if cache_key in self.minimization_cache:
+            state = self.minimization_cache[cache_key] 
+            self.set_state(**state)
+            return
+
         # Minimize the supplied params
         if len(params)==0:
             print "Error: No Paramaterize to Minimize"
@@ -334,21 +345,21 @@ class likelihood(object):
 
         # Get the initial guess
         guess = [getattr(self, param) for param in params]
-        self.logging.debug("Minimizing: ")
-        for param, val in zip(params, guess):
-            self.logging.debug("%s : %s" % (param, val))
 
         # Run the minimization
         res = optimize.minimize(nnl_for_min, guess)
-        self.logging.debug("Successfully Minimized:", res)
+        self.logging.debug("Successfully Minimized the function to value:", res)
         
         # Set the values to the minimum
         min_values = res.x
         for (param, val) in zip(params, min_values):
-            self.logging.debug("%s : %s" % (param, val))
+            self.logging.debug("Minimized value of %s : %s" % (param, val))
             setattr(self, param, val)
 
-        return min
+        # Cache the result
+        self.minimization_cache[cache_key] = self.state()
+
+        return
 
 
     def profile(self, data, poi, nuisance, **kwargs):
@@ -368,7 +379,12 @@ class likelihood(object):
         # Get the set of parameters
         all_params = [poi]
         all_params.extend(nuisance)
-        self.logging.debug( "All Params: %s" % all_params)
+        self.logging.debug( "Profiling poi: %s and nuisance params %s" % (poi, str(nuisance)) )
+
+        # Save the current state
+        saved_state = {}
+        for arg in all_params:
+            saved_state[arg] = getattr(self, arg)
 
         # Get the constant parameters
         '''
@@ -381,17 +397,31 @@ class likelihood(object):
         '''
 
         # Get the global min
-        self.fitTo(data, params=all_params)
-        global_nll = self.nll(data)
+        cache_key = hash((data, frozenset(all_params))) 
+        if cache_key in self.nll_cache:
+            global_nll = self.nll_cache[cache_key]
+        else:
+            self.fitTo(data, params=all_params)
+            global_nll = self.nll(data)
+            self.nll_cache[cache_key] = global_nll
         
-        #    self._cache[const_params] = global_nll
-        #else:
-        #    global_nll = self._cache[const_params]
-
         # Get the local min at this point
         setattr(self, poi, current_poi_value)
         self.fitTo(data, params=nuisance)
         local_nll = self.nll(data)
+
+        # Restore the state
+        for arg in all_params:
+            setattr(self, arg, saved_state[arg])
+
+        '''
+        nll = self.nll(data)
+        output = "Profile: global nll: " + str(global_nll) \
+            + " local_nll: " + str(local_nll) \
+            + " original nll: " + str(nll)
+        self.logging.debug(output)
+        '''
+        self.logging.debug("Found Profile. Local nll: %s Global nll: %s" % (local_nll, global_nll))
 
         return local_nll - global_nll
 
