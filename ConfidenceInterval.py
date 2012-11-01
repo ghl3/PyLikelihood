@@ -426,79 +426,124 @@ class likelihood(object):
         return local_nll - global_nll
 
 
-'''
-def main():
+    def sample(self, params, nsamples=1, method='mc', **kwargs):
+        """ Generate sample points based on the likelihood
 
-    # Annoying boilerplate
-    def pois(x, mu):
-        return poisson.pmf(x, mu)
-    def gauss(x, mu, sigma):
-        return norm.pdf(x, mu, sigma)
+        """
 
-    d = variable("d", 0, 10, 100)
-    mu = variable("mu", 0, 10, 100)
-    mu0 = variable("mu0", 0, 10, 100)
-
-    def pdf(d, mu=5.0, mu0=5.0, sigma=2.0):
-        return gauss(d, mu, 2.0)*gauss(mu0, mu, sigma)
-
-
-    #func_spec = inspect.getargspec(pdf)
-    #(all_arguments, all_defaults) = (func_spec.args, func_spec.defaults)
-    #print "Spec: ", func_spec
-    #print "Arguments: ", all_arguments
-    #print "Defaults: ", all_defaults
-
-    # Create the likelihood
-    model = likelihood(pdf, data=d, params=[mu, mu0])
-
-    print model
-
-    from pprint import pprint
-    pprint (vars(model))
-    print model.mu
-    print model.mu0
-
-    model.mu = 5.0
-    model.mu0 = 5.0
-    #model.sigma = 1.0
-
-    print model.norm
-    model.eval(5)
-    print model.norm
-
-    return
+        if method=='':
+            print "Must supply method for generate()"
+            raise Exception("generate")
+        elif method=='mcmc':
+            return self.sample_mcmc(params, nsamples, **kwargs)
+        elif method=='mc':
+            return self.sample_mc(params, nsamples, **kwargs)
+        else:
+            print "Supplied invalid method for generate(): %s" % method
+            raise Exception("generate")
 
 
+    def sample_mc(self, data, params=[], nsamples=1):
+        """ Sample from the likelihood using brute force Monte-Carlo
 
-    for point in range(0, 10):
-        print point, ": ", model(point), ": ", model.eval(point)
+        """
 
-    print model.get_interval(0.68)
+        for param in params:
+            if not hasattr(self, param):
+                self.log.error("Cannot sample parameter %s, no such parameter" % param)
+                raise Exception("SampleError")
+            pass
 
-    model.make_plot(interval=0.68)
-    plt.savefig("plot.pdf")
+        # Save the current state
+        saved_state = self.state()
 
-    # clear the current figure and
-    # plot the neyman interval
-    plt.clf()
-    neyman = model.get_neyman(0.68, "mu")
-    for pair in neyman:
-        #print pair
-        (mu, x0, x1) = pair[0], pair[1][0], pair[1][1]
-        plt.hlines(mu, x0, x1)
-    plt.xlabel('x')
-    plt.ylabel('mu')
-    plt.savefig("neyman.pdf")
+        results=[]
+        for i_sample in xrange(nsamples):
+            while True:
+            
+                # Set the values
+                for param in params:
+                    param_var = self.param_dict[param]
+                    #(param_min, param_max) = (param_var.
+                    val = random.uniform(param_var.min, param_var.max)
+                    setattr(self, param, val)
+            
+                # Get the likelihood
+                lhood = self.eval(data)
 
-    print "inverted Neyman 4.5: ", model.invert_neyman(4.5, neyman)
-    print "inverted Neyman 5.0: ", model.invert_neyman(5.0, neyman)
-    print "inverted Neyman 5.5: ", model.invert_neyman(5.5, neyman)
-    print "inverted Neyman 6.0: ", model.invert_neyman(6.0, neyman)
-    print "inverted Neyman 8.0: ", model.invert_neyman(8.0, neyman)
+                # Throw the Monte-Carlo dice:
+                mc_val = random.uniform(0.0, 1.0)
+                if lhood > mc_val: break
+
+            point = {}
+            for param in params:
+                point[param] = getattr(self, param)
+
+            results.append(point)
+
+        self.set_state(**saved_state)
+        return results
 
 
-if __name__=="__main__":
-    main()
 
-'''
+    def sample_mcmc(self, params=[], nsamples=1, nwalkers=6):
+        """
+        
+        Generate 'nsamples' points based on the likelihood
+        Use the emcee package for MarkovChain Monte-Carlo
+
+        return a list of dictionaries of name, val pairs for the
+        supplied points
+        """
+
+        try:
+            import emcee
+        except ImportError:
+            print "Cannot use Markov Chain Monte Carlo, must install 'emcee' package"
+            print "See: https://danfm.ca/emcee/"
+            raise
+
+        saved_state = self.get_state()
+
+        def func_for_emcee(val_list):
+            """ Requires the log probability and 
+            params as an array """
+            
+            # Set the state based on the input list
+            for (param, val) in zip(params, val_list):
+                setattr(self, param, val)
+                
+            # Return the log likelihood
+            log_lhood = self.loglikelihood()
+            return log_lhood
+
+        # Setup emcee
+        # WARNING: Check ranges here
+        p0 = [[random.uniform(-1, 1) for i in params] for j in xrange(nwalkers)]
+    
+        #nwalkers
+        ndim = len(params)
+        sampler = emcee.EnsembleSampler(nwalkers, ndim, func_for_emcee)
+
+        # Run 500 steps as a burn-in.
+        pos, prob, state = sampler.run_mcmc(p0, 500)
+
+        # Reset the chain to remove the burn-in samples.
+        sampler.reset()
+        
+        # Starting from the final position in the burn-in chain, sample for 2000
+        # steps.
+        sampler.run_mcmc(pos, nsamples, rstate0=state)
+        
+        # Unpack the results
+        results = []
+        for (isample,sample) in enumerate(sampler.flatchain):
+            point = {}
+            for (iparam, param) in enumerate(params):
+                point[param] = sample[iparam]
+            results.append(point)
+        
+        self.set_state(**saved_state)
+        return results
+        
+
