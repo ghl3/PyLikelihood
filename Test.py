@@ -41,7 +41,7 @@ def print_model(model):
 
     # Testing the normalization on evaluation
     print model.norm
-    model.eval(5)
+    model.eval(d=5)
     print model.norm
 
 
@@ -119,8 +119,8 @@ def test_interval(model, obs_data):
 
 def test_mc(model, obs_data):
 
-    model.fitTo(obs_data, params=["s", "b"])
-    samples = model.sample_mc(obs_data, ['d'], 1000)
+    model.fitTo(params=["s", "b"], d=obs_data)
+    samples = model.sample_mc(['d'], 1000)
     values = [point['d'] for point in samples]
     print values
     n, bins, patches = plt.hist(values, 20, normed=1, facecolor='g')

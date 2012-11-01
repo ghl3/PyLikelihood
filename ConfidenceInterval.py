@@ -128,6 +128,20 @@ class likelihood(object):
         self.nll_cache = {}
 
 
+    def get_data(self):
+        """ Get the current value of the data
+        """
+        data_name = self.data.name
+        return getattr(self, data_name)
+
+
+    def set_data(self, val):
+        """ Get the current value of the data
+        """
+        data_name = self.data.name
+        return setattr(self, data_name, val)
+
+
     def state(self):
         """ Return a dict with the current state of data and parameters
 
@@ -156,17 +170,17 @@ class likelihood(object):
         return
 
 
-    def _eval_raw(self, x, **kwargs):
+    def _eval_raw(self, **kwargs):
         """ Get the current state of the likelihood
         without any normalization
 
         """
         self.set_state(**kwargs)
         current_state = self.state()
-        return self.pdf(x, **current_state)
+        return self.pdf(self.get_data(), **current_state)
         
 
-    def eval(self, x, **kwargs):
+    def eval(self, **kwargs):
         """ Val of pdf based on the current state,
         Evaluated on the given data point
         This includes normalization, which is cached
@@ -174,7 +188,7 @@ class likelihood(object):
         """
         self.set_state(**kwargs)
         self.normalize()
-        return self._eval_raw(x)*self.norm 
+        return self._eval_raw()*self.norm 
 
 
     def normalize(self):
@@ -191,11 +205,16 @@ class likelihood(object):
         except KeyError:
             pass
 
+        def func_for_norm(data):
+            self.set_data(data)
+            return self._eval_raw()
+
         # If not, integrate over the data, invert it, 
         # and store the cache
         data_min, data_max = (self.data.min, self.data.max)
         self.logging.debug("Integrating: " + str( self.state()))
-        integral, err = integrate.quad(self._eval_raw, data_min, data_max) 
+        #integral, err = integrate.quad(self._eval_raw, data_min, data_max) 
+        integral, err = integrate.quad(func_for_norm, data_min, data_max) 
         self.norm = 1.0 / integral
         self.normalization_cache[param_state] = self.norm
         return self.norm
@@ -276,7 +295,7 @@ class likelihood(object):
         return
 
 
-    def invert_neyman(self, data_point, neyman=None, percentage=None, param=None):
+    def invert_neyman(self, neyman=None, percentage=None, param=None, **kwargs):
         """ Invert neyman to get confidence interval
         
         The Neyman list looks like: [ (mu, (d0, d1)), ...
@@ -289,7 +308,7 @@ class likelihood(object):
 
         for item in neyman:
             (mu, (d0, d1)) = item
-            if d0 <= data_point and data_point <= d1:
+            if d0 <= self.get_data() and self.get_data() <= d1:
                 mu_list.append(mu)
             pass
         
@@ -299,7 +318,7 @@ class likelihood(object):
         return (min(mu_list), max(mu_list))
 
 
-    def fitTo(self, data, params, **kwargs):
+    def fitTo(self, params, **kwargs):
         """ Minmize the supplied parameters based on the nll
 
         Set the values of the minimized parameters in the
@@ -347,7 +366,7 @@ class likelihood(object):
                 setattr(self, param, val)
 
             # nll without normalization
-            return -1*log(self._eval_raw(data))
+            return -1*log(self._eval_raw())
 
         # Get the initial guess
         guess = [getattr(self, param) for param in params]
@@ -368,7 +387,7 @@ class likelihood(object):
         return
 
 
-    def profile(self, data, poi, nuisance, **kwargs):
+    def profile(self, poi, nuisance, **kwargs):
         """ Return the profile likelihood as a function of the poi
 
         (parameter of interest), minimizing over the nuisance parameters
@@ -403,18 +422,18 @@ class likelihood(object):
         '''
 
         # Get the global min
-        cache_key = hash((data, frozenset(all_params))) 
+        cache_key = hash((self.get_data(), frozenset(all_params))) 
         if cache_key in self.nll_cache:
             global_nll = self.nll_cache[cache_key]
         else:
             self.fitTo(data, params=all_params)
-            global_nll = self.nll(data)
+            global_nll = self.nll()
             self.nll_cache[cache_key] = global_nll
         
         # Get the local min at this point
         setattr(self, poi, current_poi_value)
-        self.fitTo(data, params=nuisance)
-        local_nll = self.nll(data)
+        self.fitTo(self.get_data(), params=nuisance)
+        local_nll = self.nll()
 
         # Restore the state
         for arg in all_params:
@@ -437,6 +456,8 @@ class likelihood(object):
 
         """
 
+        self.set_state(**kwargs)
+
         if method=='':
             print "Must supply method for generate()"
             raise Exception("generate")
@@ -449,10 +470,12 @@ class likelihood(object):
             raise Exception("generate")
 
 
-    def sample_mc(self, data, params=[], nsamples=1):
+    def sample_mc(self, params=[], nsamples=1, **kwargs):
         """ Sample from the likelihood using brute force Monte-Carlo
 
         """
+
+        self.set_state(**kwargs)
 
         for param in params:
             if not hasattr(self, param):
@@ -478,7 +501,7 @@ class likelihood(object):
                     setattr(self, param, val)
             
                 # Get the likelihood
-                lhood = self.eval(data)
+                lhood = self.eval()
 
                 # Throw the Monte-Carlo dice:
                 mc_val = random.uniform(0.0, 1.0)
