@@ -6,6 +6,7 @@ import inspect
 import logging
 logging.basicConfig()
 
+import random
 import scipy as sp
 import numpy as np
 import matplotlib.pyplot as plt
@@ -53,6 +54,7 @@ class likelihood(object):
 
         # Set the pdf
         self.pdf = pdf
+        self.args = {}
 
         # Use inspection to find all arguments of the pdf
         func_spec = inspect.getargspec(self.pdf)
@@ -82,7 +84,8 @@ class likelihood(object):
             setattr(self, data.name, default_dict[data.name])
         else:
             setattr(self, data.name, 0.0)
-
+        #self.param_dict[data.name] = data
+            
         # Get the list of parameters,
         # create variables based on them,
         # and store that list of variables
@@ -116,6 +119,9 @@ class likelihood(object):
             else:
                 setattr(self, param_var.name, 0.0)
         
+        self.args.update(self.param_dict)
+        self.args[self.data.name] = self.data
+
         self.norm = 1.0
         self.normalization_cache = {}
         self.minimization_cache = {}
@@ -459,13 +465,16 @@ class likelihood(object):
 
         results=[]
         for i_sample in xrange(nsamples):
+
+            print "Generating sample: %s" % i_sample
             while True:
             
                 # Set the values
                 for param in params:
-                    param_var = self.param_dict[param]
+                    param_var = self.args[param] #param_dict[param]
                     #(param_min, param_max) = (param_var.
                     val = random.uniform(param_var.min, param_var.max)
+                    print "Setting attribute: %s %s" % (param, val)
                     setattr(self, param, val)
             
                 # Get the likelihood
@@ -473,6 +482,12 @@ class likelihood(object):
 
                 # Throw the Monte-Carlo dice:
                 mc_val = random.uniform(0.0, 1.0)
+
+                print "MC Accept/Reject: ",
+                print " state: ", str(self.state().update( \
+                        {self.data.name: getattr(self, self.data.name)})),
+                print " likelihood: ", lhood
+                print " mc_val: ", mc_val
                 if lhood > mc_val: break
 
             point = {}

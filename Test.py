@@ -117,12 +117,27 @@ def test_interval(model, obs_data):
     print "inverted Neyman 14: ", model.invert_neyman(14, neyman)
 
 
+def test_mc(model, obs_data):
+
+    model.fitTo(obs_data, params=["s", "b"])
+    samples = model.sample_mc(obs_data, ['d'], 1000)
+    values = [point['d'] for point in samples]
+    print values
+    n, bins, patches = plt.hist(values, 20, normed=1, facecolor='g')
+    plt.xlabel('data')
+    plt.ylabel('Probability')
+    #plt.text(60, .025, r'$\mu=100,\ \sigma=15$')
+    #plt.axis([40, 160, 0, 0.03])
+    plt.grid(True)
+    plt.savefig("sampled_data.pdf")
+
 if __name__=="__main__":
     model = create_model()
-    #print_model(model)
+    print_model(model)
 
     obs_data = 7
 
     #test_minimization(model, obs_data)
     #test_profile(model, obs_data)
-    test_interval(model, obs_data)
+    #test_interval(model, obs_data)
+    test_mc(model, obs_data)
