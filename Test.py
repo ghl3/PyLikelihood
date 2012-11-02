@@ -180,9 +180,8 @@ def test_mc(model, obs_data):
 
     model.fitTo(obs_data, params=["s", "b"])
     #samples = model.sample_mc(['d'], 2000)
-    samples = model.sample_mcmc(['d'], 2000)
+    samples = model.sample_mc(['d'], 2000)
     values = [point['d'] for point in samples]
-    #print values
 
     # Plot the sampled values
     plt.clf()
@@ -192,7 +191,28 @@ def test_mc(model, obs_data):
     #plt.text(60, .025, r'$\mu=100,\ \sigma=15$')
     #plt.axis([40, 160, 0, 0.03])
     plt.grid(True)
-    plt.savefig("sampled_data.pdf")
+    plt.savefig("sampled_data_mc.pdf")
+    plt.clf()
+
+
+def test_mcmc(model, obs_data):
+
+    print "Test mcmc"
+
+    model.fitTo(obs_data, params=["s", "b"])
+    #samples = model.sample_mc(['d'], 2000)
+    samples = model.sample_mcmc(['d'], 2000)
+    values = [point['d'] for point in samples]
+
+    # Plot the sampled values
+    plt.clf()
+    n, bins, patches = plt.hist(values, bins=20, range=[0,20], normed=1, facecolor='g')
+    plt.xlabel('data'),
+    plt.ylabel('Probability')
+    #plt.text(60, .025, r'$\mu=100,\ \sigma=15$')
+    #plt.axis([40, 160, 0, 0.03])
+    plt.grid(True)
+    plt.savefig("sampled_data_mcmc.pdf")
     plt.clf()
 
 
@@ -210,3 +230,4 @@ if __name__ == "__main__":
     #test_neyman(model, obs_data)
     #test_profile(model, obs_data)
     test_mc(model, obs_data)
+    test_mcmc(model, obs_data)
