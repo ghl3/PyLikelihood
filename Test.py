@@ -5,7 +5,10 @@ from ConfidenceInterval import *
 
 import math
 
+
 def create_model():
+
+    print "Creating Model"
 
     # Annoying boilerplate
     def pois(x, mu):
@@ -25,19 +28,21 @@ def create_model():
     model = likelihood(pdf, data=d, params=[s, b])
     model.logging.setLevel(logging.DEBUG)
 
+    # Test the setting of parameters
+    model.s = 1.0
+    model.b = 5.0
+
     return model
 
 
 def print_model(model):
 
+    print "Printing Model"
+
     # Print the model
     print model
     from pprint import pprint
     pprint (vars(model))
-
-    # Test the setting of parameters
-    model.s = 1.0
-    model.b = 5.0
 
     # Testing the normalization on evaluation
     print model.norm
@@ -47,14 +52,20 @@ def print_model(model):
 
 def test_minimization(model, obs_data):
 
+    print "Test Minimization"
+
     # Test the minimization
-    print "Fitting to data=10: "
+    print "Fitting to data=%s: " % obs_data
     #obs_data = 10
     model.fitTo(obs_data, params=["s", "b"])
     nll_min = model.nll(d=obs_data)
+    print "Fitted State: ", model.total_state()
+    print "Fitted Nll: ", nll_min
 
 
 def test_profile(model, obs_data):
+
+    print "Test Profile"
 
     plt.clf()
 
@@ -86,11 +97,12 @@ def test_profile(model, obs_data):
     plt.xlabel('mu')
     plt.ylabel('profile likelihood(x)')
     plt.savefig("profile.pdf")
-
     plt.clf()
 
 
-def test_interval(model, obs_data):
+def test_data_plot(model):
+
+    print "Test Data Plot"
 
     # Test the interval functionality (over data)
     plt.clf()
@@ -98,6 +110,35 @@ def test_interval(model, obs_data):
     model.make_plot(interval=0.68)
     plt.xlabel('data')
     plt.savefig("plot.pdf")
+    plt.clf()
+
+
+def test_likelihood_plot(model, obs_data):
+
+    print "Test Likelihood Plot"
+
+    # Test the interval functionality (over data)
+    plt.clf()
+    model.d = obs_data
+    model.fitTo(obs_data, params=["s", "b"])
+
+    print "Likelihood Plot, Model State: ", str(model.total_state())
+    x = model.s_var.linspace()
+    z = [model.eval(s=point) for point in x]
+    plt.plot(x, z)
+    plt.xlabel('s')
+    plt.ylabel('likelihood(s)')
+
+    #x1,x2,y1,y2 = plt.axis()
+    #model.make_plot(interval=0.68)
+    #plt.xlabel('data')
+    plt.savefig("likelihood.pdf")
+    plt.clf()
+
+
+def test_neyman(model, obs_data):
+
+    print "Test Neyman"
 
     # clear the current figure and
     # plot the neyman interval
@@ -109,15 +150,33 @@ def test_interval(model, obs_data):
     plt.xlabel('x')
     plt.ylabel('s')
     plt.savefig("neyman.pdf")
+    plt.clf()
 
     #print "inverted Neyman 4: ", model.invert_neyman(4, neyman)
-    print "inverted Neyman 8: ",  model.invert_neyman(8, neyman)
-    print "inverted Neyman 10: ", model.invert_neyman(10, neyman)
-    print "inverted Neyman 12: ", model.invert_neyman(12, neyman)
-    print "inverted Neyman 14: ", model.invert_neyman(14, neyman)
+    print "inverted Neyman data=6, bkg=", model.b, " s within:", model.invert_neyman(6, neyman)
+    print "inverted Neyman data=8, bkg=", model.b, " s within:", model.invert_neyman(8, neyman)
+    print "inverted Neyman data=10, bkg=", model.b, " s within:", model.invert_neyman(10, neyman)
+    print "inverted Neyman data=12, bkg=", model.b, " s within:", model.invert_neyman(12, neyman)
+    print "inverted Neyman data=14, bkg=", model.b, " s within:", model.invert_neyman(14, neyman)
+
+    #print "inverted Neyman data=10: ", model.invert_neyman(10, neyman)
+    #print "inverted Neyman data=12: ", model.invert_neyman(12, neyman)
+    #print "inverted Neyman data=14: ", model.invert_neyman(14, neyman)
+
+
+def test_data(model):
+
+    print "Test data"
+
+    model.set_data(10)
+    print "Set data to 10.  Has data: ", model.get_data()
+    print "Model Data Variable: ", model.data.name, model.data
+    print "Model Data by direct access: ", model.d
 
 
 def test_mc(model, obs_data):
+
+    print "Test mc"
 
     model.fitTo(obs_data, params=["s", "b"])
     samples = model.sample_mc(['d'], 1000)
@@ -125,6 +184,7 @@ def test_mc(model, obs_data):
     #print values
 
     # Plot the sampled values
+    plt.clf()
     n, bins, patches = plt.hist(values, 20, normed=1, facecolor='g')
     plt.xlabel('data')
     plt.ylabel('Probability')
@@ -132,14 +192,20 @@ def test_mc(model, obs_data):
     #plt.axis([40, 160, 0, 0.03])
     plt.grid(True)
     plt.savefig("sampled_data.pdf")
+    plt.clf()
 
-if __name__=="__main__":
+
+if __name__ == "__main__":
     model = create_model()
     print_model(model)
 
     obs_data = 7
 
-    #test_minimization(model, obs_data)
-    #test_profile(model, obs_data)
-    test_interval(model, obs_data)
+
+    test_data(model)
+    test_data_plot(model)
+    test_likelihood_plot(model, obs_data)
+    test_minimization(model, obs_data)
+    test_neyman(model, obs_data)
+    test_profile(model, obs_data)
     test_mc(model, obs_data)

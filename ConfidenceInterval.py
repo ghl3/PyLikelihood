@@ -118,7 +118,8 @@ class likelihood(object):
                 setattr(self, param_var.name, default_dict[param_var.name])
             else:
                 setattr(self, param_var.name, 0.0)
-        
+            setattr(self, param_var.name + "_var", param_var)
+
         self.args.update(self.param_dict)
         self.args[self.data.name] = self.data
 
@@ -142,14 +143,26 @@ class likelihood(object):
         return setattr(self, data_name, val)
 
 
-    def state(self):
-        """ Return a dict with the current state of data and parameters
+    def param_state(self):
+        """ Return a dict with the current state only the parameters
 
         """
         current_state = {}
         #current_state[self.data.name] = self.data.val
         for name, param in self.param_dict.iteritems():
             current_state[param.name] = getattr(self, param.name)
+        return current_state
+
+
+    def total_state(self):
+        """ Return a dict with the current state including data and all parameters
+
+        """
+        current_state = {}
+        #current_state[self.data.name] = self.data.val
+        for name, param in self.param_dict.iteritems():
+            current_state[param.name] = getattr(self, param.name)
+        current_state[self.data.name] = self.get_data()
         return current_state
 
 
@@ -174,10 +187,14 @@ class likelihood(object):
         """ Get the current state of the likelihood
         without any normalization
 
+        Any values can be set via kwargs, and the evaluation
+        will take place after those kwargs are set
         """
+
         self.set_state(**kwargs)
-        current_state = self.state()
-        return self.pdf(self.get_data(), **current_state)
+        current_state = self.total_state()
+        #return self.pdf(self.get_data(), **current_state)
+        return self.pdf(**current_state)
         
 
     def eval(self, **kwargs):
@@ -185,13 +202,40 @@ class likelihood(object):
         Evaluated on the given data point
         This includes normalization, which is cached
 
+        The current state can be set via kwargs, and
+        the normalization will take place after the
+        current state is set.
+
         """
         self.set_state(**kwargs)
+
+        # We have to normalize, but we should be sure
+        # to restore the state after, so we aren't effected
+        # by the random data points used to evaluate the integral
+        #current_state = self.total_state()
+        #current_data = self.get_data()
         self.normalize()
+        #self.set_data(current_data)
+        #self.set_state(**current_state)
+
         return self._eval_raw()*self.norm 
 
 
-    def evalData(self, data):
+    def eval_data(self, data, **kwargs):
+        """ Evaluate the pdf on a given value of data
+
+        This is useful if one needs a function of data
+        but doesn't know the name of the data parameter.
+        Any other parameters can be set via kwargs, and
+        the likelihood will be evaluated after those
+        parameters are set.
+
+        In the event that the kwargs set the data, the
+        first argument of this function will over ride
+        that setting.
+
+        """
+        self.set_state(**kwargs)
         self.set_data(data)
         return self.eval()
 
@@ -203,25 +247,42 @@ class likelihood(object):
 
         # Check if the normalization has been cached
         # If so, return that cache
-        param_state = hash(frozenset(self.state().items()))
+        norm_key = str(self.param_state().items())
         try:
-            #print "Found Norm in Cache"
-            return self.normalization_cache[param_state]
+            norm = self.normalization_cache[norm_key]
+            self.norm = norm
+            #self.logging.debug("Got Norm From Cache: %s from state: %s" % \
+            #                       (self.norm, str(self.param_state())) )
+            return norm
         except KeyError:
             pass
 
-        def func_for_norm(data):
-            self.set_data(data)
+        # First we save the current value of data
+        # since we are about to integrate over it
+        current_data = self.get_data()
+        
+        # To normalize, we integrate the 'raw' function
+        # over data
+        def func_for_norm(data_val):
+            self.set_data(data_val)
             return self._eval_raw()
 
         # If not, integrate over the data, invert it, 
         # and store the cache
         data_min, data_max = (self.data.min, self.data.max)
-        self.logging.debug("Integrating: " + str( self.state()))
+        #self.logging.debug("Integrating: " + str(self.param_state()))
         #integral, err = integrate.quad(self._eval_raw, data_min, data_max) 
         integral, err = integrate.quad(func_for_norm, data_min, data_max) 
         self.norm = 1.0 / integral
-        self.normalization_cache[param_state] = self.norm
+        #print "Found integral: ", integral, " Normalization: ", self.norm
+        self.normalization_cache[norm_key] = self.norm
+
+        # Restore the data value
+        self.set_data(current_data)
+
+        self.logging.debug("Got Norm From Integral: %s from state: %s" % \
+                               (self.norm, str(self.param_state())) )
+
         return self.norm
     
 
@@ -246,7 +307,7 @@ class likelihood(object):
         
         """
         points = self.data.linspace()
-        pair_list = zip(points, map(self.evalData, points))
+        pair_list = zip(points, map(self.eval_data, points))
 
         # ordering rule is maximum likelihood
         # sort by descending in likelihood
@@ -286,13 +347,13 @@ class likelihood(object):
         """ Plot the likelihood over data
         """
 
-        def eval_data(data):
-            self.set_data(data)
-            return self.eval()
+        #def eval_data(data):
+        #    self.set_data(data)
+        #    return self.eval()
 
         x = self.data.linspace()
-        y = map(eval_data, x)
-        plt.plot(x,y)
+        y = map(self.eval_data, x)
+        plt.plot(x, y)
         plt.xlabel('x')
         plt.ylabel('likelihood(x)')
         x1,x2,y1,y2 = plt.axis()
@@ -350,8 +411,10 @@ class likelihood(object):
         # NOT YET IMPLEMENTED
         # Create a key based on the values of the params to not minimize
         # and the list of params to minimize (possibly overkill, but whatevs)
-        constant_params = [item for item in self.state().items() if item[0] not in params]
-        cache_key = (hash(frozenset(constant_params)), hash(frozenset(params)))
+        # as well as the data being minimized
+        constant_params = [item for item in self.param_state().items() if item[0] not in params]
+        #cache_key = hash( (data, frozenset(constant_params), frozenset(params)) )
+        cache_key = (data, frozenset(constant_params), frozenset(params))
         if cache_key in self.minimization_cache:
             state = self.minimization_cache[cache_key] 
             self.set_state(**state)
@@ -363,16 +426,19 @@ class likelihood(object):
             raise Exception("FitTo")
             return
 
-        current_state = self.state()
+        # Set the value of the data to the supplied data
+        self.set_data(data)
+
+        current_state = self.total_state()
         self.normalize()
 
         # Create the function for minimization
-        def nnl_for_min(param_values):
+        def nnl_for_min(param_value_list):
             """ Create the wrapper function for scipy.optimize
 
             """
 
-            for (param, val) in zip(params, param_values):
+            for (param, val) in zip(params, param_value_list):
                 setattr(self, param, val)
 
             # nll without normalization
@@ -392,7 +458,7 @@ class likelihood(object):
             setattr(self, param, val)
 
         # Cache the result
-        self.minimization_cache[cache_key] = self.state()
+        self.minimization_cache[cache_key] = self.total_state()
 
         return
 
@@ -432,7 +498,8 @@ class likelihood(object):
         '''
 
         # Get the global min
-        cache_key = hash((self.get_data(), frozenset(all_params))) 
+        #cache_key = hash((self.get_data(), frozenset(all_params))) 
+        cache_key = (self.get_data(), frozenset(all_params)) 
         if cache_key in self.nll_cache:
             global_nll = self.nll_cache[cache_key]
         else:
