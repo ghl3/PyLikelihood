@@ -561,12 +561,15 @@ class likelihood(object):
             pass
 
         # Save the current state
-        saved_state = self.state()
+        saved_state = self.total_state()
 
         results=[]
         for i_sample in xrange(nsamples):
 
-            print "Generating sample: %s" % i_sample
+            # Some output
+            if i_sample % 1000 == 1:
+                print "Generating sample: %s" % i_sample
+
             while True:
             
                 # Set the values
@@ -574,7 +577,7 @@ class likelihood(object):
                     param_var = self.args[param] #param_dict[param]
                     #(param_min, param_max) = (param_var.
                     val = random.uniform(param_var.min, param_var.max)
-                    self.logging.debug("Setting attribute: %s %s" % (param, val))
+                    #self.logging.debug("Setting attribute: %s %s" % (param, val))
                     setattr(self, param, val)
             
                 # Get the likelihood
@@ -583,14 +586,15 @@ class likelihood(object):
                 # Throw the Monte-Carlo dice:
                 mc_val = random.uniform(0.0, 1.0)
 
+                '''
                 debug_string =  "MC Accept/Reject: "
-                total_state = self.state()
-                total_state.update({self.data.name: getattr(self, self.data.name)})
+                total_state = self.total_state()
                 debug_string += " state: " + str(total_state)
                 debug_string += " likelihood: %s" % lhood
                 debug_string += " mc_val: %s" % mc_val
                 self.logging.debug(debug_string)
-                
+                '''
+
                 if lhood > mc_val: break
 
             point = {}
