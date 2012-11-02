@@ -657,9 +657,10 @@ class likelihood(object):
         # Setup emcee
         # WARNING: Check ranges here
         # Set up the initial states of the walkers:
-        p0 = [[random.uniform(param.min, param.max) for (name, param) in self.args.iteritems() if name in params] for j in xrange(nwalkers)]
-        print "Initial guess: ", p0
-        print self.param_dict
+        p0 = [ [random.uniform(param.min, param.max) 
+               for (name, param) in self.args.iteritems() 
+               if name in params] 
+              for j in xrange(nwalkers) ]
         #p0 = [[random.uniform(-1, 1) for i in params] for j in xrange(nwalkers)]
     
         #nwalkers
