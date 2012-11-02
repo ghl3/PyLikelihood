@@ -179,7 +179,8 @@ def test_mc(model, obs_data):
     print "Test mc"
 
     model.fitTo(obs_data, params=["s", "b"])
-    samples = model.sample_mc(['d'], 2000)
+    #samples = model.sample_mc(['d'], 2000)
+    samples = model.sample_mcmc(['d'], 2000)
     values = [point['d'] for point in samples]
     #print values
 

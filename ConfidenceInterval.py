@@ -194,7 +194,11 @@ class likelihood(object):
         self.set_state(**kwargs)
         current_state = self.total_state()
         #return self.pdf(self.get_data(), **current_state)
-        return self.pdf(**current_state)
+        pdf_val = self.pdf(**current_state)
+        if pdf_val < 0:
+            print "Error: Pdf is 0 at state: ", current_state
+            raise Exception("PdfVal")
+        return pdf_val
         
 
     def eval(self, **kwargs):
@@ -218,7 +222,11 @@ class likelihood(object):
         #self.set_data(current_data)
         #self.set_state(**current_state)
 
-        return self._eval_raw()*self.norm 
+        likelihood_val = self._eval_raw()*self.norm 
+        if likelihood_val < 0:
+            print "Error: Pdf is 0 at state: ", current_state
+            raise Exception("PdfVal")
+        return likelihood_val
 
 
     def eval_data(self, data, **kwargs):
@@ -274,6 +282,11 @@ class likelihood(object):
         #integral, err = integrate.quad(self._eval_raw, data_min, data_max) 
         integral, err = integrate.quad(func_for_norm, data_min, data_max) 
         self.norm = 1.0 / integral
+
+        if self.norm <= 0:
+            print "Error: Normalization is <= 0"
+            raise Exception("BadNormalization")
+
         #print "Found integral: ", integral, " Normalization: ", self.norm
         self.normalization_cache[norm_key] = self.norm
 
@@ -293,7 +306,11 @@ class likelihood(object):
 
     # Log Likelihood
     def loglikelihood(self, *args, **kwargs):
-        return log(self.eval(*args, **kwargs))
+        likelihood = self.eval(*args, **kwargs)
+        if likelihood == 0:
+            return -1*np.inf
+            #return 0
+        return log(likelihood)
 
 
     # Negative Log Likelihood
@@ -607,7 +624,7 @@ class likelihood(object):
         return results
 
 
-    def sample_mcmc(self, params=[], nsamples=1, nwalkers=6):
+    def sample_mcmc(self, params=[], nsamples=1, nwalkers=6, burn_in=500):
         """
         
         Generate 'nsamples' points based on the likelihood
@@ -624,7 +641,7 @@ class likelihood(object):
             print "See: https://danfm.ca/emcee/"
             raise
 
-        saved_state = self.get_state()
+        saved_state = self.total_state()
 
         def func_for_emcee(val_list):
             """ Requires the log probability and 
@@ -635,19 +652,22 @@ class likelihood(object):
                 setattr(self, param, val)
                 
             # Return the log likelihood
-            log_lhood = self.loglikelihood()
-            return log_lhood
+            return self.loglikelihood()
 
         # Setup emcee
         # WARNING: Check ranges here
-        p0 = [[random.uniform(-1, 1) for i in params] for j in xrange(nwalkers)]
+        # Set up the initial states of the walkers:
+        p0 = [[random.uniform(param.min, param.max) for (name, param) in self.args.iteritems() if name in params] for j in xrange(nwalkers)]
+        print "Initial guess: ", p0
+        print self.param_dict
+        #p0 = [[random.uniform(-1, 1) for i in params] for j in xrange(nwalkers)]
     
         #nwalkers
         ndim = len(params)
         sampler = emcee.EnsembleSampler(nwalkers, ndim, func_for_emcee)
 
         # Run 500 steps as a burn-in.
-        pos, prob, state = sampler.run_mcmc(p0, 500)
+        pos, prob, state = sampler.run_mcmc(p0, burn_in)
 
         # Reset the chain to remove the burn-in samples.
         sampler.reset()
