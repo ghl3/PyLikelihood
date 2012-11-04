@@ -1,229 +1,287 @@
 #!/usr/bin/env python
 
+
+from ConfidenceInterval import *
+
 import math
-import itertools
-import operator
 
-from Likelihood import *
+from time import time
 
-import matplotlib.pyplot as plt
-import numpy as np
+def time_it(f):
+    def timed_function(*args, **kwargs):
+        begin = time()
+        # Run the original function
+        ret_val = f(*args, **kwargs)
+        end = time()
+        print "Function: ", f.__name__, "Time: ", end-begin
+        return ret_val
+    return timed_function
 
-from scipy.stats import poisson
-from scipy.stats import norm
-import scipy.integrate
+@time_it
+def create_model():
 
-def pois(x, l):
-    rv = poisson([l])
-    return rv.pmf(x)[0]
+    print "Creating Model"
 
-def gauss(x, mu, sigma):
-    rv = norm(loc=mu, scale=sigma)
-    return rv.pdf([x])[0]
+    # Annoying boilerplate
+    def pois(x, mu):
+        return poisson.pmf(math.floor(x), mu)
+    def gauss(x, mu, sigma):
+        return norm.pdf(x, mu, sigma)
 
-def simple_likelihood(d, n, mu, alpha_1, delta_1, alpha_2, delta_2):
-    """ The probability of a single data point given parametres
-    
-    """
-    n_hat = n*mu*(1.0 + alpha_1*delta_1 + alpha_2*delta_2)
-    val = pois(d, n_hat)*gauss(0.0, alpha_1, 1.0)*gauss(0.0, alpha_2, 1.0)
+    d = variable("d", 0, 20, 100)
+    s = variable("s", 0, 20, 100)
+    b = variable("b", 0, 20, 100)
+    b0 = variable("b0", 0, 20, 100)
 
-    # Add some simple protection
-    small_num =  10e-25
-    if math.isnan(val):
-        #print "Val is NAN"
-        return small_num
-    if val <= small_num:
-        #print "Val is small", val
-        return small_num
+    def pdf(d, s, b, b0=5.0, sigma=1.0):
+        #return gauss(d, mu, 2.0)*gauss(mu0, mu, sigma)
+        return pois(d, s+b)*gauss(b0, b, sigma)
 
-    return val
+    # Create the likelihood
+    model = likelihood(pdf, data=d, params=[s, b, b0])
+    model.logging.setLevel(logging.DEBUG)
 
-def my_func(x, y):
-    return math.exp(-1*(x-y)*(x-y))
-    #return gauss(x, mu, sigma)
+    # Test the setting of parameters
+    model.s = 1.0
+    model.b = 5.0
 
-def triple_gauss(x, y, z, mu=0, sigma=1):
-    return gauss(x,mu,sigma)*gauss(y,mu,sigma)*gauss(z,mu,sigma)
+    return model
 
 
-def makeGrid(num_points, ranges):
-    """ Create a list of dimension 'dim' points on the unit cube
-    
-    dim = dimension of each vector (ie, the number of alpha's)
-    num_points = the number of points in each direction
-    min, max are the range of the box
-    
-    ranges  [(min1, max1), (min2, max2)...]
+@time_it
+def print_model(model):
 
-    Each dimension has num_points that are equally separated
-    (0, 0, .2), (0, 0, .4), ...
-    (0, .2, 0), (0, .4, 0), ...
-    ...
-    
-    ps. itertools rocks
-    
-    """
+    print "Printing Model"
 
-    # Make the list of deltas
-    deltas = [ (pair[1]-pair[0])/float(num_points-1) for pair in ranges]
+    # Print the model
+    print model
+    from pprint import pprint
+    pprint (vars(model))
 
-    # Create the iterator factory
-    def createGenerator(dx):
-        for j in xrange(num_points):
-            yield j*dx
+    # Testing the normalization on evaluation
+    print model.norm
+    model.eval(d=5)
+    print model.norm
 
-    # Make the list of iteratoers
-    iteraters = [createGenerator(dx) for dx in deltas]
+@time_it
+def test_minimization(model, obs_data):
 
-    # return itertools magic
-    return itertools.product( *iteraters )
-
-
-def main():
-
-
-    params = ["mu", "alpha_1", "alpha_2"]
-    npoints = 10
-    ranges = [(-5,5), (-5,5), (-5,5)]
-    volume = reduce(operator.mul, [(pair[1]-pair[0])/float(npoints) for pair in ranges] )
-    grid = makeGrid(npoints, ranges)
-
-    integral = 0.0
-    for point in grid:
-        #val = simple_likelihood(10, 8, point[0], point[1], 1, point[2], 2) 
-        val = triple_gauss(*point)
-        integral += val*volume
-
-    print integral
-    return
-                   
-
-    # Try normalizing the 'simple_likelihood'
-    #params = ["mu", "alpha_1", "alpha_2"]
-    #grid = makeGrid( len(params), .1, 
-
-    
-
-    FORMAT = "%(message)s"
-    logging.basicConfig(format=FORMAT)
-    logging.root.setLevel(logging.DEBUG)
-
-    # Create the dataset
-    dataset = [2]
-
-    # Test the integral
-    # Create a simple likelihood model
-
-    model = Likelihood(dataset, gauss)
-    model.mu=0.0
-    model.sigma=1.0
-    print model.get_state()
-
-    print model.eval(2)
-    print model.eval(2, mu=3)
-
-    print model.likelihood()
-    model.minimize(params=['mu'])
-
-    # Sample the model:
-    model.setRange('mu', -5, 5)
-
-    print "Scipy Integral: ", model.integral(2, 'mu')
-
-    # Test the sampling
-    nsamples=500
-    samples = model.sample(params=['mu'], nsamples=nsamples, method='mcmc')
-    lik_samples = [model.likelihood(**sample) for sample in samples]
-    mu_samples = [sample['mu'] for sample in samples]
-
-    #for i in range(5000):
-    #    sample = model.sample(dataset, args=['mu'])
-    #    print sample
-    #    likelihood_samples.append(sample['likelihood'])
-    #    mu_samples.append(sample['values']['mu'])
-
-    plt.figure()
-    # Get the "true" values
-    points = scipy.linspace(-5, 5, num=100)
-    y = [model.likelihood(mu=p) for p in points]
-    plt.plot(points, y, label="likelihood")
-    # Plot the histogram of samples
-    plt.hist(mu_samples, 100, normed=True, facecolor='g', alpha=0.75, label="sampled")
-    plt.legend()
-    plt.savefig("sample_test.pdf")    
-
-    return
-
-    #
-    # Create a more complicated likelihood model
-    #
-
-    model = Likelihood(simple_likelihood)
-
-    model.n = 10
-    model.mu = 1.0
-    model.alpha_1 = 0
-    model.delta_1 = .2
-    model.alpha_2 = 0
-    model.delta_2 = .3
-
-    data = [12]
-
-    # Test the integral
-    '''
-    integral = 0.0
-    for point in range(0, 100):
-        integral += model.eval(point)
-    print "Integral: ", integral
-    print "Scipy Integral: ", model.integral()
-    return
-    '''
-
-
-
-    pll = model.profile(data, "mu", nuisance=['alpha_1', 'alpha_2'])
-    print "Profile Likelihood: ", pll
-
-    print model.likelihood(data)
-    print model.get_state()
-
-    print model.likelihood(data, alpha_1=1)
-    print model.get_state()
-
-    model.alpha_1=0.0
+    print "Test Minimization"
 
     # Test the minimization
-    #model.minimize(data, params=['mu','alpha'])
-    model.minimize(data, params=['mu'])
-    model.minimize(data, params=['mu','alpha_1'])
-    model.minimize(data, params=['mu','alpha_1', 'alpha_2'])
-                    
-    # Plot the likelihood as a function of mu
-    x = scipy.linspace(0, 2, num=100)
-    #y = [model.profile(data, mu=p) for p in x]
-    model.log.setLevel(logging.WARNING)
-    y = [model.nll(data, mu=p) for p in x]
-    z = [model.profile(data, "mu", ["alpha_1", "alpha_2"], mu=p) for p in x]
-    model.log.setLevel(logging.DEBUG)
-    #z = [model.profile(data, "mu", ['alpha_1'], mu=p) for p in x]
-    plt.figure()
-    plt.plot(x,y, label="nll")
-    plt.plot(x,z, label="profile")
-    plt.legend()
-    plt.savefig("nll.pdf")    
-    return
-
-    # Test the pois
-    x = np.arange(-5, 5, .1)
-    y = [gauss(point, 0, 1) for point in x]
-    plt.figure()
-    plt.plot(x, y)
-    plt.savefig("gauss.pdf")
+    print "Fitting to data=%s: " % obs_data
+    #obs_data = 10
+    model.fitTo(obs_data, params=["s", "b"])
+    nll_min = model.nll(d=obs_data)
+    print "Fitted State: ", model.total_state()
+    print "Fitted Nll: ", nll_min
 
 
-    #x = scipy.linspace(0,10,11)
-    #pylab.plot(x, pois(x,5))
+@time_it
+def test_profile(model, obs_data):
 
-if __name__=="__main__":
-    main()
+    print "Test Profile"
+
+    plt.clf()
+
+    # Testing the profile
+    model.fitTo(obs_data, params=["s", "b"])
+    nll_min = model.nll(d=obs_data)
+    profile_min = model.profile(d=obs_data, poi="s", nuisance=["b"])
+    print "nll_min: ", nll_min
+    print " profile min: ", profile_min
+
+    # create the x values
+    x = model.data.linspace()
+
+    # Draw Nll
+    model.fitTo(obs_data, params=["s", "b"])
+    y = [model.nll(d=obs_data, s=sig) - nll_min for sig in x]
+    plt.plot(x,y)
+
+    # Draw profile nll
+    model.fitTo(obs_data, params=["s", "b"])
+    z = [model.profile(d=obs_data, poi="s", s=sig, nuisance=["b"], ) for sig in x]
+    plt.plot(x,z)
+
+    (ymin, ymax) = plt.ylim()
+    (xmin, xmax) = plt.xlim()
+    plt.ylim([0, ymax]) 
+    plt.hlines(0.5, xmin, xmax)
+
+    plt.xlabel('mu')
+    plt.ylabel('profile likelihood(x)')
+    plt.savefig("profile.pdf")
+    plt.clf()
+
+
+@time_it
+def test_data_plot(model):
+
+    print "Test Data Plot"
+
+    # Test the interval functionality (over data)
+    plt.clf()
+    model.fitTo(obs_data, params=["s", "b"])
+    model.make_plot(interval=0.68)
+    plt.xlabel('data')
+    plt.savefig("plot.pdf")
+    plt.clf()
+
+
+@time_it
+def test_likelihood_plot(model, obs_data):
+
+    print "Test Likelihood Plot"
+
+    # Test the interval functionality (over data)
+    plt.clf()
+    model.d = obs_data
+    model.fitTo(obs_data, params=["s", "b"])
+
+    print "Likelihood Plot, Model State: ", str(model.total_state())
+    x = model.s_var.linspace()
+    z = [model.eval(s=point) for point in x]
+    plt.plot(x, z)
+    plt.xlabel('s')
+    plt.ylabel('likelihood(s)')
+
+    #x1,x2,y1,y2 = plt.axis()
+    #model.make_plot(interval=0.68)
+    #plt.xlabel('data')
+    plt.savefig("likelihood.pdf")
+    plt.clf()
+
+
+@time_it
+def test_neyman(model, obs_data):
+
+    print "Test Neyman"
+
+    # clear the current figure and
+    # plot the neyman interval
+    plt.clf()
+    neyman = model.get_neyman(0.68, "s")
+    for pair in neyman:
+        (s, x0, x1) = pair[0], pair[1][0], pair[1][1]
+        plt.hlines(s, x0, x1)
+    plt.xlabel('x')
+    plt.ylabel('s')
+    plt.savefig("neyman.pdf")
+    plt.clf()
+
+    #print "inverted Neyman 4: ", model.invert_neyman(4, neyman)
+    print "inverted Neyman data=6, bkg=", model.b, " s within:", model.invert_neyman(6, neyman)
+    print "inverted Neyman data=8, bkg=", model.b, " s within:", model.invert_neyman(8, neyman)
+    print "inverted Neyman data=10, bkg=", model.b, " s within:", model.invert_neyman(10, neyman)
+    print "inverted Neyman data=12, bkg=", model.b, " s within:", model.invert_neyman(12, neyman)
+    print "inverted Neyman data=14, bkg=", model.b, " s within:", model.invert_neyman(14, neyman)
+
+    #print "inverted Neyman data=10: ", model.invert_neyman(10, neyman)
+    #print "inverted Neyman data=12: ", model.invert_neyman(12, neyman)
+    #print "inverted Neyman data=14: ", model.invert_neyman(14, neyman)
+
+
+@time_it
+def test_data(model):
+
+    print "Test data"
+
+    model.set_data(10)
+    print "Set data to 10.  Has data: ", model.get_data()
+    print "Model Data Variable: ", model.data.name, model.data
+    print "Model Data by direct access: ", model.d
+
+
+@time_it
+def test_mc(model, obs_data):
+
+    print "Test mc"
+
+    model.fitTo(obs_data, params=["s", "b"])
+    #samples = model.sample_mc(['d'], 2000)
+    samples = model.sample_mc(['d'], 2000)
+    values = [point['d'] for point in samples]
+
+    # Plot the sampled values
+    plt.clf()
+    n, bins, patches = plt.hist(values, bins=20, range=[0,20], normed=1, facecolor='g')
+    plt.xlabel('data'),
+    plt.ylabel('Probability')
+    #plt.text(60, .025, r'$\mu=100,\ \sigma=15$')
+    #plt.axis([40, 160, 0, 0.03])
+    plt.grid(True)
+    plt.savefig("sampled_data_mc.pdf")
+    plt.clf()
+
+
+@time_it
+def test_mcmc(model, obs_data):
+
+    print "Test mcmc"
+
+    model.fitTo(obs_data, params=["s", "b"])
+    #samples = model.sample_mc(['d'], 2000)
+    samples = model.sample_mcmc(['d'], 2000)
+    values = [point['d'] for point in samples]
+
+    # Plot the sampled values
+    plt.clf()
+    n, bins, patches = plt.hist(values, bins=20, range=[0,20], normed=1, facecolor='g')
+    plt.xlabel('data'),
+    plt.ylabel('Probability')
+    #plt.text(60, .025, r'$\mu=100,\ \sigma=15$')
+    #plt.axis([40, 160, 0, 0.03])
+    plt.grid(True)
+    plt.savefig("sampled_data_mcmc.pdf")
+    plt.clf()
+
+
+@time_it
+def test_statistic_distribution(model):
+    
+    # Let the test statistic be the profile likelihood ratio
+
+    # Fit to the observed data
+    model.b = 5
+    model.s = 5
+
+    # Generate data samples under this model
+    #samples = model.sample_mcmc(['d'], 10000)
+    samples = model.sample_mc(['d'], 100)
+    #values = [point['d','b0'] for point in samples]
+    
+    # and plot the profile likelihood
+    plr_list = []
+    for point in samples:
+        model.b = random.uniform(4.8, 5.2)
+        model.s = random.uniform(4.8, 5.2)
+        model.d = point['d']
+        #model.b0 = point['b0']
+        prof_like = model.profile(poi="s", nuisance=['b'])
+        print "Profile Likelihood: ", prof_like
+        plr_list.append(prof_like)
+    print plr_list
+        
+    plt.clf()
+    plt.hist(plr_list, bins=50, range=[min(plr_list), max(plr_list)], normed=True)
+    plt.grid(True)
+    plt.savefig("profile_likelihood_distribution.pdf")
+    plt.clf()
+
+
+if __name__ == "__main__":
+    model = create_model()
+    print_model(model)
+
+    obs_data = 7
+
+    test_data(model)
+    test_statistic_distribution(model)
+    #test_data_plot(model)
+    #test_likelihood_plot(model, obs_data)
+    #test_minimization(model, obs_data)
+    #test_neyman(model, obs_data)
+    #test_profile(model, obs_data)
+    #test_mc(model, obs_data)
+    #test_mcmc(model, obs_data)

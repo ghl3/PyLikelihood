@@ -16,15 +16,14 @@ class Likelihood(object):
 
     _arg_list=[]
     _pdf=None
-    _dataset=None
     _integral_value=1.0
+
     _var_ranges = {}
     _cache = {}
     log = logging.getLogger()
 
-    def __init__(self, dataset, pdf):
-        self.setDataset(dataset)
-        self._setPdf(pdf)
+    def __init__(self, pdf, data_var=None):
+        self._setPdf(pdf, data_var)
 
     def setRange(self, param, min, max):
         if param in self._arg_list:
@@ -36,18 +35,21 @@ class Likelihood(object):
     def setDataset(self, dataset):
         self._dataset=dataset
 
-    def _setPdf(self, pdf, **kwargs):
+    def _setPdf(self, pdf, data_var, **kwargs):
         """ Set the likelihood function to be 'func'
 
-        The first argument is interpreted as a list
-        that represents the data
+        If the 'data_var' parameter is not 'None', then
+        the first variable is the function over data
+        Else, it is the parameter of name 'data_var'
+
         
         This instance of the class will get members for
         every parameter of the function (except for the
-        first one).
+        one that is interpreted as data).
         Future calls to the method "likelihood" will call
         this function, but using the stored values in this
-        class as the arguments.
+        class as the arguments, unless those parameters are
+        explicitely given.
 
         keyword arguments set the default values to
         these parameters.  Otherwise, they get None
@@ -60,35 +62,36 @@ class Likelihood(object):
         
         # Get the parameters of the function
         func_spec = inspect.getargspec(pdf)
-        arg_list = func_spec.args[1:]
+        if data_var==None:
+            arg_list = func_spec.args[1:]
+        else:
+            if data_var not in func_spec.args:
+                print "Error: Supplied data parameter: ", data_var, 
+                print " is not a parameter of the function:" func_spec.args
+                raise Exception("DataVar")
+            else:
+                arg_list = [arg for arg in func_spec.args if arg != data_var]
+        
+        # Create members for every parameter
+        # Any argument initial values can be set
+        # as keyword arguments
         for arg_name in arg_list:
             if arg_name in kwargs:
                 setattr(self, arg_name, kwargs[arg_name])
             else:
                 setattr(self, arg_name, None)
 
+        # Ensure that any kwargs actually are parameters
         for arg_name in kwargs:
             if arg_name not in arg_list:
                 self._log.error("Error: setLikelihood recieved argument %s" % arg_name /
                                " but this is not a keyword argument of the likelihood" )
                 raise Exception("Likelihood Argument Error")
 
+        # Store the pdf and the arg list
         self._arg_list = arg_list
         self._pdf = pdf
 
-
-    '''
-    def get_function_args(self):
-        """ Return the kwargs for the callable
-        based on the current state
-
-        """
-        function_args = {}
-        for arg in self._arg_list:
-            val = getattr(self, arg)
-            function_args[arg] = val
-        return function_args
-    '''
 
     def get_state(self):
         """ Get a dictionary represeting the current state
@@ -105,13 +108,16 @@ class Likelihood(object):
 
         Return any args that aren't parameters of the likelihood
         """
-        unused_args = {}
+
         for (arg, val) in kwargs.iteritems():
             if arg in self._arg_list:
                 setattr(self, arg, val)
             else:
-                unused_args[arg] = val
-        return unused_args
+                print "Error: Cannot set state argument: ", arg,
+                print " in likelihood, it does not exist"
+                raise Exception("SetState")
+            pass
+        return
 
 
     def eval(self, data_point, **kwargs):
@@ -133,10 +139,13 @@ class Likelihood(object):
         return likelihood_val
 
 
-    def likelihood(self, **kwargs):
+    def likelihood(self, data, **kwargs):
         """ Get the current value of the likelihood
-        based on the current state of the pdf
-        and the internal dataset
+        based on the current state of the pdf.
+
+        If the 'data' is a single value, we act on that value.
+        If it's a list, we return the product of the data
+        over that list.
 
         Any supplied keyword arguments that match arguments
         to that function will be set as arguments to the 
@@ -145,19 +154,24 @@ class Likelihood(object):
         """
 
         self.set_state(**kwargs)
-
-        # Get the value
         func_args = self.get_state()
+
+        import collections
+
         likelihood_val = 1.0
-        for point in self._dataset:
-            likelihood_val *= self._pdf(point, **func_args)
-            
+
+        if isinstance(data, collections.Iterable):
+            for point in data:
+                likelihood_val *= self._pdf(point, **func_args)
+            pass
+        else:
+            likelihood_val = self._pdf(point, **func_args)
+
         self._check_value(likelihood_val)
-        
         return likelihood_val
 
 
-    def loglikelihood(self, **kwargs):
+    def loglikelihood(self, data. **kwargs):
         """ Return the log likelihood 
 
         Evaluate on the supplied data and return the value
@@ -168,7 +182,7 @@ class Likelihood(object):
 
         self.set_state(**kwargs)
 
-        likelihood_val = self.likelihood(**kwargs)
+        likelihood_val = self.likelihood(data, **kwargs)
 
         try:
             log_val = math.log(likelihood_val)
@@ -179,16 +193,16 @@ class Likelihood(object):
         return log_val
 
 
-    def nll(self, **kwargs):
+    def nll(self, data, **kwargs):
         """ Return the negative log likelihood
         This is a simple extension of the 'loglikelihood' method
 
         """
         
-        return -1*self.loglikelihood(**kwargs)
+        return -1*self.loglikelihood(data, **kwargs)
 
 
-    def minimize(self, params, **kwargs):
+    def fitTo(self, data, params, **kwargs):
         """ Minmize the supplied parameters based on the nll
 
         Set the values of the minimized parameters in the
