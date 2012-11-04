@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 
-from ConfidenceInterval import *
+from Likelihood import *
 
 import math
 
@@ -277,8 +277,8 @@ if __name__ == "__main__":
     obs_data = 7
 
     test_data(model)
-    test_statistic_distribution(model)
-    #test_data_plot(model)
+    #test_statistic_distribution(model)
+    test_data_plot(model)
     #test_likelihood_plot(model, obs_data)
     #test_minimization(model, obs_data)
     #test_neyman(model, obs_data)
