@@ -18,6 +18,7 @@ from scipy import integrate
 from scipy import optimize
 
 from math import log
+from math import ceil
 
 class variable(object):
     """ A class to store a name, value, and range
@@ -423,7 +424,7 @@ class likelihood(object):
         """
 
         # Log
-        self.logging.debug( "Minimizing: " + str(params))
+        self.logging.debug( "Minimizing: " + str(params) + " on state: " + str(self.total_state()))
 
         # NOT YET IMPLEMENTED
         # Create a key based on the values of the params to not minimize
@@ -434,6 +435,7 @@ class likelihood(object):
         cache_key = (data, frozenset(constant_params), frozenset(params))
         if cache_key in self.minimization_cache:
             state = self.minimization_cache[cache_key] 
+            print "Using fitTo Cache: ", state
             self.set_state(**state)
             return
 
@@ -446,7 +448,7 @@ class likelihood(object):
         # Set the value of the data to the supplied data
         self.set_data(data)
 
-        current_state = self.total_state()
+        #current_state = self.total_state()
         self.normalize()
 
         # Create the function for minimization
@@ -460,19 +462,43 @@ class likelihood(object):
 
             # nll without normalization
             return -1*log(self._eval_raw())
+            #return -1*self._eval_raw()
+            #return self.nll()
+
+        def set_to_minimum(res):
+            
+            # Set the values to the minimum
+            min_values = res.x
+            for (param, val) in zip(params, min_values):
+                param_min = getattr(self, param+"_var").min 
+                param_max = getattr(self, param+"_var").max
+                if val < param_min : val = param_min
+                if val > param_max : val = param_max
+                self.logging.debug("Minimized value of %s : %s" % (param, val))
+                setattr(self, param, val)
 
         # Get the initial guess
         guess = [getattr(self, param) for param in params]
 
         # Run the minimization
-        res = optimize.minimize(nnl_for_min, guess)
-        self.logging.debug("Successfully Minimized the function to value:", res)
-        
-        # Set the values to the minimum
-        min_values = res.x
-        for (param, val) in zip(params, min_values):
-            self.logging.debug("Minimized value of %s : %s" % (param, val))
-            setattr(self, param, val)
+        '''
+        res = optimize.minimize(nnl_for_min, guess, method="Nelder-Mead", tol=0.00001)
+        #res = optimize.minimize(nnl_for_min, guess, method="BFGS", tol=0.00001)
+        #res = optimize.minimize(nnl_for_min, guess, method="Anneal", tol=0.00001)
+        set_to_minimum(res)
+        '''
+
+        bounds = []
+        for param in params:
+            param_min = getattr(self, param+"_var").min 
+            param_max = getattr(self, param+"_var").max
+            bounds.append( (param_min, param_max) )
+        res = optimize.minimize(nnl_for_min, guess, method="TNC", 
+                                bounds=bounds, tol=0.000001)
+
+        set_to_minimum(res)
+
+        self.logging.debug("Successfully Minimized the function: " + str(res))
 
         # Cache the result
         self.minimization_cache[cache_key] = self.total_state()
@@ -504,18 +530,7 @@ class likelihood(object):
         for arg in all_params:
             saved_state[arg] = getattr(self, arg)
 
-        # Get the constant parameters
-        '''
-        const_params = []
-        for param in self._arg_list:
-            if param == poi: continue
-            if param in nuisance: continue
-            const_params.append( (param, getattr(self, param)) )
-        const_params = tuple(const_params)
-        '''
-
         # Get the global min
-        #cache_key = hash((self.get_data(), frozenset(all_params))) 
         cache_key = (self.get_data(), frozenset(all_params)) 
         if cache_key in self.nll_cache:
             global_nll = self.nll_cache[cache_key]
@@ -533,13 +548,6 @@ class likelihood(object):
         for arg in all_params:
             setattr(self, arg, saved_state[arg])
 
-        '''
-        nll = self.nll(data)
-        output = "Profile: global nll: " + str(global_nll) \
-            + " local_nll: " + str(local_nll) \
-            + " original nll: " + str(nll)
-        self.logging.debug(output)
-        '''
         self.logging.debug("Found Profile. Local nll: %s Global nll: %s" % (local_nll, global_nll))
 
         return local_nll - global_nll
@@ -675,7 +683,8 @@ class likelihood(object):
         
         # Starting from the final position in the burn-in chain, sample for 2000
         # steps.
-        sampler.run_mcmc(pos, nsamples, rstate0=state)
+        samples_per_walker = ceil(nsamples / nwalkers)
+        sampler.run_mcmc(pos, samples_per_walker, rstate0=state)
         
         # Unpack the results
         results = []
