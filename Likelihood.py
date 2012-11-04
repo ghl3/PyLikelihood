@@ -1,106 +1,170 @@
+#!/usr/bin/env python
 
-import sys
-import math
+from __future__ import division
 
-import logging
 import inspect
-from pprint import pprint
-
-import scipy.optimize
-import scipy.integrate
+import logging
+logging.basicConfig()
 
 import random
+import scipy as sp
+import numpy as np
+import matplotlib.pyplot as plt
+
+from scipy.stats import poisson
+from scipy.stats import norm
+
+from scipy import integrate
+from scipy import optimize
+
+from math import log
+from math import ceil
+
+class variable(object):
+    """ A class to store a name, value, and range
+
+    """
+
+    def __init__(self, name, var_min=-np.inf, var_max=np.inf, num_points=1000):
+        self.name = name
+        self.min = var_min
+        self.max = var_max
+        self.num_points = num_points
+        #self.val = 0.0
+
+    def linspace(self):
+        return np.linspace(self.min, self.max, self.num_points)
+
+    pass
 
 
-class Likelihood(object):
+class likelihood(object):
+    """ A function which evaluates a pdf on data
 
-    _arg_list=[]
-    _pdf=None
-    _integral_value=1.0
+    A likelihood class takes a pdf: pdf(data, *params)
+    One can specify the data argument and the various
+    parameters by name, or by supplying 'variables'
+    (which then give those arguments min, max and num_points)
+    
+    """
 
-    _var_ranges = {}
-    _cache = {}
-    log = logging.getLogger()
+    # Create an internal logger
+    logging = logging.getLogger("likelihood")
 
-    def __init__(self, pdf, data_var=None):
-        self._setPdf(pdf, data_var)
+    def __init__(self, pdf, data=None, params=None):
 
-    def setRange(self, param, min, max):
-        if param in self._arg_list:
-            self._var_ranges[param] = (min, max)
+        # Set the pdf
+        self.pdf = pdf
+        self.args = {}
+
+        # Use inspection to find all arguments of the pdf
+        func_spec = inspect.getargspec(self.pdf)
+        (all_arguments, all_defaults) = (func_spec.args, func_spec.defaults)
+
+        # Get the defaults for any arguments that have them
+        default_dict = {}
+        for name, val in zip( reversed(all_arguments), reversed(all_defaults) ):
+            default_dict[name] = val
+
+        # Determine the data var and save an internal 'variable'
+        # If none is supplied, assume it's the 0th argument
+        # If a string is supplied, create a new variable
+        if data == None:
+            data = all_arguments[0]
+        if isinstance(data, variable):
+            self.data = data
         else:
-            self.log.error("Cannot set range, param %s not found" % param)
-            raise Exception("ParamNotFound")
+            self.data = variable(data)
+        if self.data.name not in all_arguments:
+            print "Error: Supplied data var is not an argument of the supplied pdf",
+            print all_arguments
+            raise Exception("InvalidDataVar")
 
-    def setDataset(self, dataset):
-        self._dataset=dataset
+        # And create an attribute for easy access
+        if data.name in default_dict:
+            setattr(self, data.name, default_dict[data.name])
+        else:
+            setattr(self, data.name, 0.0)
+        #self.param_dict[data.name] = data
+            
+        # Get the list of parameters,
+        # create variables based on them,
+        # and store that list of variables
+        self.param_dict = {}
+        param_list = [arg for arg in func_spec.args if arg != self.data.name]
+        for param in param_list:
 
-    def _setPdf(self, pdf, data_var, **kwargs):
-        """ Set the likelihood function to be 'func'
+            # Check if the parameter matches one in the
+            # supplied list of parameter 'variables'
+            matching_var_list = [var for var in params if var.name==param]
+            
+            param_var = None
 
-        If the 'data_var' parameter is not 'None', then
-        the first variable is the function over data
-        Else, it is the parameter of name 'data_var'
+            if len(matching_var_list)==0:
+                self.logging.debug("Creating new param with name: " + param)
+                param_var = variable(param)
+                # If the parameter has a default in the function definition,
+                # Set that default here
+                # MUST SET: param_var.val = param.defaults
+            elif len(matching_var_list)==1:
+                param_var = matching_var_list[0]
+            else:
+                print "Error: More than one parameter variable supplied ",
+                print "with the name: ", param
+                raise Exception("ParamVariable")
+            self.param_dict[param_var.name] = param_var
 
-        
-        This instance of the class will get members for
-        every parameter of the function (except for the
-        one that is interpreted as data).
-        Future calls to the method "likelihood" will call
-        this function, but using the stored values in this
-        class as the arguments, unless those parameters are
-        explicitely given.
+            # And create an attribute for easy access
+            if param_var.name in default_dict:
+                setattr(self, param_var.name, default_dict[param_var.name])
+            else:
+                setattr(self, param_var.name, 0.0)
+            setattr(self, param_var.name + "_var", param_var)
 
-        keyword arguments set the default values to
-        these parameters.  Otherwise, they get None
+        self.args.update(self.param_dict)
+        self.args[self.data.name] = self.data
+
+        self.norm = 1.0
+        self.normalization_cache = {}
+        self.minimization_cache = {}
+        self.nll_cache = {}
+
+
+    def get_data(self):
+        """ Get the current value of the data
+        """
+        data_name = self.data.name
+        return getattr(self, data_name)
+
+
+    def set_data(self, val):
+        """ Get the current value of the data
+        """
+        data_name = self.data.name
+        return setattr(self, data_name, val)
+
+
+    def param_state(self):
+        """ Return a dict with the current state only the parameters
 
         """
-        if self._pdf != None:
-            print "Error: Cannot Change pdf in likelihood once set"
-            print "Instead, create a new likelihood instance"
-            raise Exception("ChangePdf")
-        
-        # Get the parameters of the function
-        func_spec = inspect.getargspec(pdf)
-        if data_var==None:
-            arg_list = func_spec.args[1:]
-        else:
-            if data_var not in func_spec.args:
-                print "Error: Supplied data parameter: ", data_var, 
-                print " is not a parameter of the function:" func_spec.args
-                raise Exception("DataVar")
-            else:
-                arg_list = [arg for arg in func_spec.args if arg != data_var]
-        
-        # Create members for every parameter
-        # Any argument initial values can be set
-        # as keyword arguments
-        for arg_name in arg_list:
-            if arg_name in kwargs:
-                setattr(self, arg_name, kwargs[arg_name])
-            else:
-                setattr(self, arg_name, None)
-
-        # Ensure that any kwargs actually are parameters
-        for arg_name in kwargs:
-            if arg_name not in arg_list:
-                self._log.error("Error: setLikelihood recieved argument %s" % arg_name /
-                               " but this is not a keyword argument of the likelihood" )
-                raise Exception("Likelihood Argument Error")
-
-        # Store the pdf and the arg list
-        self._arg_list = arg_list
-        self._pdf = pdf
+        current_state = {}
+        #current_state[self.data.name] = self.data.val
+        for name, param in self.param_dict.iteritems():
+            current_state[param.name] = getattr(self, param.name)
+        return current_state
 
 
-    def get_state(self):
-        """ Get a dictionary represeting the current state
+    def total_state(self):
+        """ Return a dict with the current state including data and all parameters
 
         """
-        state = {}
-        for arg in self._arg_list:
-            state[arg] = getattr(self, arg)
-        return state        
+        current_state = {}
+        #current_state[self.data.name] = self.data.val
+        for name, param in self.param_dict.iteritems():
+            current_state[param.name] = getattr(self, param.name)
+        current_state[self.data.name] = self.get_data()
+        return current_state
 
 
     def set_state(self, **kwargs):
@@ -110,7 +174,7 @@ class Likelihood(object):
         """
 
         for (arg, val) in kwargs.iteritems():
-            if arg in self._arg_list:
+            if hasattr(self, arg):
                 setattr(self, arg, val)
             else:
                 print "Error: Cannot set state argument: ", arg,
@@ -120,86 +184,227 @@ class Likelihood(object):
         return
 
 
-    def eval(self, data_point, **kwargs):
-        """ 
-        Evaluate the current state of the pdf
-        on a datapoint
+    def _eval_raw(self, **kwargs):
+        """ Get the current state of the likelihood
+        without any normalization
+
+        Any values can be set via kwargs, and the evaluation
+        will take place after those kwargs are set
+        """
+
+        self.set_state(**kwargs)
+        current_state = self.total_state()
+        #return self.pdf(self.get_data(), **current_state)
+        pdf_val = self.pdf(**current_state)
+        if pdf_val < 0:
+            print "Error: Pdf is 0 at state: ", current_state
+            raise Exception("PdfVal")
+        return pdf_val
         
-        """
 
-        # Set the state based on the kwargs
+    def eval(self, **kwargs):
+        """ Val of pdf based on the current state,
+        Evaluated on the given data point
+        This includes normalization, which is cached
+
+        The current state can be set via kwargs, and
+        the normalization will take place after the
+        current state is set.
+
+        """
         self.set_state(**kwargs)
 
-        # Get the value
-        func_args = self.get_state()
-        likelihood_val = self._pdf(data_point, **func_args)
+        # We have to normalize, but we should be sure
+        # to restore the state after, so we aren't effected
+        # by the random data points used to evaluate the integral
+        #current_state = self.total_state()
+        #current_data = self.get_data()
+        self.normalize()
+        #self.set_data(current_data)
+        #self.set_state(**current_state)
 
-        self._check_value(likelihood_val)
-
+        likelihood_val = self._eval_raw()*self.norm 
+        if likelihood_val < 0:
+            print "Error: Pdf is 0 at state: ", current_state
+            raise Exception("PdfVal")
         return likelihood_val
 
 
-    def likelihood(self, data, **kwargs):
-        """ Get the current value of the likelihood
-        based on the current state of the pdf.
+    def eval_data(self, data, **kwargs):
+        """ Evaluate the pdf on a given value of data
 
-        If the 'data' is a single value, we act on that value.
-        If it's a list, we return the product of the data
-        over that list.
+        This is useful if one needs a function of data
+        but doesn't know the name of the data parameter.
+        Any other parameters can be set via kwargs, and
+        the likelihood will be evaluated after those
+        parameters are set.
 
-        Any supplied keyword arguments that match arguments
-        to that function will be set as arguments to the 
-        function, and they will be saved in the state
-
-        """
-
-        self.set_state(**kwargs)
-        func_args = self.get_state()
-
-        import collections
-
-        likelihood_val = 1.0
-
-        if isinstance(data, collections.Iterable):
-            for point in data:
-                likelihood_val *= self._pdf(point, **func_args)
-            pass
-        else:
-            likelihood_val = self._pdf(point, **func_args)
-
-        self._check_value(likelihood_val)
-        return likelihood_val
-
-
-    def loglikelihood(self, data. **kwargs):
-        """ Return the log likelihood 
-
-        Evaluate on the supplied data and return the value
-        We catch any ValueError exceptions here since these
-        can occur 
+        In the event that the kwargs set the data, the
+        first argument of this function will over ride
+        that setting.
 
         """
-
         self.set_state(**kwargs)
+        self.set_data(data)
+        return self.eval()
 
-        likelihood_val = self.likelihood(data, **kwargs)
 
+    def normalize(self):
+        """ Integrate over the data
+        at the current parameter point
+        """
+
+        # Check if the normalization has been cached
+        # If so, return that cache
+        norm_key = str(self.param_state().items())
         try:
-            log_val = math.log(likelihood_val)
-        except ValueError:
-            self.log.error("Encountered Val Error.  Input to log: ", likelihood_val)
-            raise Exception("NegativeLogLikelihoodEval")
+            norm = self.normalization_cache[norm_key]
+            self.norm = norm
+            #self.logging.debug("Got Norm From Cache: %s from state: %s" % \
+            #                       (self.norm, str(self.param_state())) )
+            return norm
+        except KeyError:
+            pass
 
-        return log_val
+        # First we save the current value of data
+        # since we are about to integrate over it
+        current_data = self.get_data()
+        
+        # To normalize, we integrate the 'raw' function
+        # over data
+        def func_for_norm(data_val):
+            self.set_data(data_val)
+            return self._eval_raw()
+
+        # If not, integrate over the data, invert it, 
+        # and store the cache
+        data_min, data_max = (self.data.min, self.data.max)
+        #self.logging.debug("Integrating: " + str(self.param_state()))
+        #integral, err = integrate.quad(self._eval_raw, data_min, data_max) 
+        integral, err = integrate.quad(func_for_norm, data_min, data_max) 
+        self.norm = 1.0 / integral
+
+        if self.norm <= 0:
+            print "Error: Normalization is <= 0"
+            raise Exception("BadNormalization")
+
+        #print "Found integral: ", integral, " Normalization: ", self.norm
+        self.normalization_cache[norm_key] = self.norm
+
+        # Restore the data value
+        self.set_data(current_data)
+
+        self.logging.debug("Got Norm From Integral: %s from state: %s" % \
+                               (self.norm, str(self.param_state())) )
+
+        return self.norm
+    
+
+    # Make the class callable:
+    def __call__(self, *args, **kwargs):
+        return self.eval(*args, **kwargs)
 
 
-    def nll(self, data, **kwargs):
-        """ Return the negative log likelihood
-        This is a simple extension of the 'loglikelihood' method
+    # Log Likelihood
+    def loglikelihood(self, *args, **kwargs):
+        likelihood = self.eval(*args, **kwargs)
+        if likelihood == 0:
+            return -1*np.inf
+            #return 0
+        return log(likelihood)
+
+
+    # Negative Log Likelihood
+    def nll(self, *args, **kwargs):
+        return -1*self.loglikelihood(*args, **kwargs)
+
+    
+    def get_interval(self, percentage):
+        """ Get an inverval over the data parameter 
+        which contains 'percentage' of the probability
+        
+        """
+        points = self.data.linspace()
+        pair_list = zip(points, map(self.eval_data, points))
+
+        # ordering rule is maximum likelihood
+        # sort by descending in likelihood
+        pair_list = sorted(pair_list, key=lambda pair: pair[1], reverse=True)
+
+        delta = (self.data.max - self.data.min) / self.data.num_points
+        
+        total_likelihood = 0.0
+        accepted_point_list = []
+        for (point, likelihood) in pair_list:
+            accepted_point_list.append(point)
+            total_likelihood += likelihood*delta
+            if total_likelihood >= percentage: break
+        
+        interval = (min(accepted_point_list), max(accepted_point_list))
+        return interval
+
+
+    def get_neyman(self, percentage, param):
+        """ Create a list of intervals
+        for the parameter 'param'
 
         """
+
+        param_var = self.param_dict[param] #getattr(self, param)
         
-        return -1*self.loglikelihood(data, **kwargs)
+        interval_list = []
+        for param_point in param_var.linspace():
+            setattr(self, param, param_point)
+            interval = self.get_interval(percentage)
+            interval_list.append( (param_point, interval) )
+
+        return interval_list
+
+
+    def make_plot(self, interval=None):
+        """ Plot the likelihood over data
+        """
+
+        #def eval_data(data):
+        #    self.set_data(data)
+        #    return self.eval()
+
+        x = self.data.linspace()
+        y = map(self.eval_data, x)
+        plt.plot(x, y)
+        plt.xlabel('x')
+        plt.ylabel('likelihood(x)')
+        x1,x2,y1,y2 = plt.axis()
+
+        if interval != None:
+            interval = self.get_interval(interval)
+            plt.vlines(interval[0], y1, y2)
+            plt.vlines(interval[1], y1, y2)
+
+        return
+
+
+    def invert_neyman(self, data, neyman=None, percentage=None, param=None, **kwargs):
+        """ Invert neyman to get confidence interval
+        
+        The Neyman list looks like: [ (mu, (d0, d1)), ...
+        """
+        
+        mu_list = []
+        
+        if neyman==None:
+            neyman = self.get_neyman(percentage, param)
+
+        for item in neyman:
+            (mu, (d0, d1)) = item
+            if d0 <= data and data <= d1:
+                mu_list.append(mu)
+            pass
+        
+        if len(mu_list)==0:
+            print "Error: No acceptable values of param found"
+
+        return (min(mu_list), max(mu_list))
 
 
     def fitTo(self, data, params, **kwargs):
@@ -218,46 +423,87 @@ class Likelihood(object):
 
         """
 
-        # Set the current state based on keyword args
-        # This will effect the initial guess and any
-        # constant parameters (non-minimized)
-        unused_kwargs = self.set_state(**kwargs)
+        # Log
+        self.logging.debug( "Minimizing: " + str(params) + " on state: " + str(self.total_state()))
 
-        if len(params)==0:
+        # NOT YET IMPLEMENTED
+        # Create a key based on the values of the params to not minimize
+        # and the list of params to minimize (possibly overkill, but whatevs)
+        # as well as the data being minimized
+        constant_params = [item for item in self.param_state().items() if item[0] not in params]
+        #cache_key = hash( (data, frozenset(constant_params), frozenset(params)) )
+        cache_key = (data, frozenset(constant_params), frozenset(params))
+        if cache_key in self.minimization_cache:
+            state = self.minimization_cache[cache_key] 
+            print "Using fitTo Cache: ", state
+            self.set_state(**state)
             return
 
+        # Minimize the supplied params
+        if len(params)==0:
+            print "Error: No Paramaterize to Minimize"
+            raise Exception("FitTo")
+            return
+
+        # Set the value of the data to the supplied data
+        self.set_data(data)
+
+        #current_state = self.total_state()
+        self.normalize()
+
         # Create the function for minimization
-        def nnl_for_min(param_values):
+        def nnl_for_min(param_value_list):
             """ Create the wrapper function for scipy.optimize
 
             """
 
-            for (nuis, val) in zip(params, param_values):
-                setattr(self, nuis, val)
-            #print self.get_state()
-            return self.nll()
+            for (param, val) in zip(params, param_value_list):
+                setattr(self, param, val)
+
+            # nll without normalization
+            return -1*log(self._eval_raw())
+            #return -1*self._eval_raw()
+            #return self.nll()
+
+        def set_to_minimum(res):
+            
+            # Set the values to the minimum
+            min_values = res.x
+            for (param, val) in zip(params, min_values):
+                param_min = getattr(self, param+"_var").min 
+                param_max = getattr(self, param+"_var").max
+                if val < param_min : val = param_min
+                if val > param_max : val = param_max
+                self.logging.debug("Minimized value of %s : %s" % (param, val))
+                setattr(self, param, val)
 
         # Get the initial guess
         guess = [getattr(self, param) for param in params]
-        self.log.debug("Minimizing: ")
-        for param, val in zip(params, guess):
-            self.log.debug("%s : %s" % (param, val))
 
         # Run the minimization
-        res = scipy.optimize.minimize(nnl_for_min, guess, **unused_kwargs)
-        self.log.debug("Successfully Minimized:", res)
+        '''
+        res = optimize.minimize(nnl_for_min, guess, method="Nelder-Mead", tol=0.00001)
+        #res = optimize.minimize(nnl_for_min, guess, method="BFGS", tol=0.00001)
+        #res = optimize.minimize(nnl_for_min, guess, method="Anneal", tol=0.00001)
+        set_to_minimum(res)
+        '''
 
-        #bounds = [self.bounds[param] for param in params]
-        #print "Minimizing: ", zip(params, guess, bounds)
-        #res = scipy.optimize.minimize(nnl_for_min, guess, bounds=bounds, method='SLSQP')
-        
-        # Set the values to the minimum
-        min_values = res.x
-        for (param, val) in zip(params, min_values):
-            self.log.debug("%s : %s" % (param, val))
-            setattr(self, param, val)
+        bounds = []
+        for param in params:
+            param_min = getattr(self, param+"_var").min 
+            param_max = getattr(self, param+"_var").max
+            bounds.append( (param_min, param_max) )
+        res = optimize.minimize(nnl_for_min, guess, method="TNC", 
+                                bounds=bounds, tol=0.000001)
 
-        return min
+        set_to_minimum(res)
+
+        self.logging.debug("Successfully Minimized the function: " + str(res))
+
+        # Cache the result
+        self.minimization_cache[cache_key] = self.total_state()
+
+        return
 
 
     def profile(self, poi, nuisance, **kwargs):
@@ -268,76 +514,51 @@ class Likelihood(object):
         return the nll of the profile likelihood
         """
 
-        #if len(nuisance)==0:
-        #    print "Error: Must supply nuisance parameters"
-        #    raise Exception("ProfileLikelihood")
-
-        # Set the State
         self.set_state(**kwargs)
 
-        # Save the current value
+        # Save the current value since we are evaluating
+        # the profile likelihood at this point
         current_poi_value = getattr(self, poi)
 
         # Get the set of parameters
         all_params = [poi]
         all_params.extend(nuisance)
-        self.log.debug( "All Params: %s" % all_params)
+        self.logging.debug( "Profiling poi: %s and nuisance params %s" % (poi, str(nuisance)) )
 
-        # Get the constant parameters
-        const_params = []
-        for (param) in self._arg_list:
-            if param == poi: continue
-            if param in nuisance: continue
-            const_params.append( (param, getattr(self, param)) )
-        const_params = tuple(const_params)
+        # Save the current state
+        saved_state = {}
+        for arg in all_params:
+            saved_state[arg] = getattr(self, arg)
 
         # Get the global min
-        if const_params not in self._cache:
-            global_min = self.minimize(params=all_params, **kwargs)
-            global_nll = self.nll(**kwargs)
-            self._cache[const_params] = global_nll
+        cache_key = (self.get_data(), frozenset(all_params)) 
+        if cache_key in self.nll_cache:
+            global_nll = self.nll_cache[cache_key]
         else:
-            global_nll = self._cache[const_params]
-
+            self.fitTo(self.get_data(), params=all_params)
+            global_nll = self.nll()
+            self.nll_cache[cache_key] = global_nll
+        
         # Get the local min at this point
         setattr(self, poi, current_poi_value)
-        local_min = self.minimize(params=nuisance, **kwargs)
-        local_nll = self.nll(**kwargs)
+        self.fitTo(self.get_data(), params=nuisance)
+        local_nll = self.nll()
 
-        return local_nll #- global_nll
+        # Restore the state
+        for arg in all_params:
+            setattr(self, arg, saved_state[arg])
 
+        self.logging.debug("Found Profile. Local nll: %s Global nll: %s" % (local_nll, global_nll))
 
-    def integral(self, data_point, param, range=None):
-        """ Return the integral of the pdf 
-        The likelihood is evaluated at the given data point 
-        for a given parameter over the supplied (or stored) range.
-
-        """
-        
-        if range == None and param not in self._var_ranges:
-            self.log.error("Integral: Param %s has no range" % param)
-            raise Exception("IntegralRange")
-
-        if range==None:
-            range = self._var_ranges[param]
-
-        saved_state = self.get_state()
-
-        def func_for_integral(val):
-            setattr(self, param, val)
-            return self.eval(data_point)
-
-        result = scipy.integrate.quad(func_for_integral, range[0], range[1])
-
-        self.set_state(**saved_state)
-
-        return result[0]
+        return local_nll - global_nll
 
 
     def sample(self, params, nsamples=1, method='mc', **kwargs):
         """ Generate sample points based on the likelihood
 
         """
+
+        self.set_state(**kwargs)
 
         if method=='':
             print "Must supply method for generate()"
@@ -351,7 +572,67 @@ class Likelihood(object):
             raise Exception("generate")
 
 
-    def sample_mcmc(self, params=[], nsamples=1, nwalkers=6):
+    def sample_mc(self, params=[], nsamples=1, **kwargs):
+        """ Sample from the likelihood using brute force Monte-Carlo
+
+        """
+
+        self.set_state(**kwargs)
+
+        for param in params:
+            if not hasattr(self, param):
+                self.log.error("Cannot sample parameter %s, no such parameter" % param)
+                raise Exception("SampleError")
+            pass
+
+        # Save the current state
+        saved_state = self.total_state()
+
+        results=[]
+        for i_sample in xrange(nsamples):
+
+            # Some output
+            if i_sample % 1000 == 1:
+                print "Generating sample: %s" % i_sample
+
+            while True:
+            
+                # Set the values
+                for param in params:
+                    param_var = self.args[param] #param_dict[param]
+                    #(param_min, param_max) = (param_var.
+                    val = random.uniform(param_var.min, param_var.max)
+                    #self.logging.debug("Setting attribute: %s %s" % (param, val))
+                    setattr(self, param, val)
+            
+                # Get the likelihood
+                lhood = self.eval()
+
+                # Throw the Monte-Carlo dice:
+                mc_val = random.uniform(0.0, 1.0)
+
+                '''
+                debug_string =  "MC Accept/Reject: "
+                total_state = self.total_state()
+                debug_string += " state: " + str(total_state)
+                debug_string += " likelihood: %s" % lhood
+                debug_string += " mc_val: %s" % mc_val
+                self.logging.debug(debug_string)
+                '''
+
+                if lhood > mc_val: break
+
+            point = {}
+            for param in params:
+                point[param] = getattr(self, param)
+
+            results.append(point)
+
+        self.set_state(**saved_state)
+        return results
+
+
+    def sample_mcmc(self, params=[], nsamples=1, nwalkers=6, burn_in=500):
         """
         
         Generate 'nsamples' points based on the likelihood
@@ -368,7 +649,7 @@ class Likelihood(object):
             print "See: https://danfm.ca/emcee/"
             raise
 
-        saved_state = self.get_state()
+        saved_state = self.total_state()
 
         def func_for_emcee(val_list):
             """ Requires the log probability and 
@@ -379,26 +660,31 @@ class Likelihood(object):
                 setattr(self, param, val)
                 
             # Return the log likelihood
-            log_lhood = self.loglikelihood()
-            return log_lhood
+            return self.loglikelihood()
 
         # Setup emcee
         # WARNING: Check ranges here
-        p0 = [[random.uniform(-1, 1) for i in params] for j in xrange(nwalkers)]
+        # Set up the initial states of the walkers:
+        p0 = [ [random.uniform(param.min, param.max) 
+               for (name, param) in self.args.iteritems() 
+               if name in params] 
+              for j in xrange(nwalkers) ]
+        #p0 = [[random.uniform(-1, 1) for i in params] for j in xrange(nwalkers)]
     
         #nwalkers
         ndim = len(params)
         sampler = emcee.EnsembleSampler(nwalkers, ndim, func_for_emcee)
 
         # Run 500 steps as a burn-in.
-        pos, prob, state = sampler.run_mcmc(p0, 500)
+        pos, prob, state = sampler.run_mcmc(p0, burn_in)
 
         # Reset the chain to remove the burn-in samples.
         sampler.reset()
         
         # Starting from the final position in the burn-in chain, sample for 2000
         # steps.
-        sampler.run_mcmc(pos, nsamples, rstate0=state)
+        samples_per_walker = ceil(nsamples / nwalkers)
+        sampler.run_mcmc(pos, samples_per_walker, rstate0=state)
         
         # Unpack the results
         results = []
@@ -411,59 +697,4 @@ class Likelihood(object):
         self.set_state(**saved_state)
         return results
         
-
-    def sample_mc(self, params=[], nsamples=1):
-        
-        for param in params:
-            if param not in self._var_ranges:
-                self.log.error("Cannot sample parameter %s, must supply range" % param)
-                raise Exception("SampleError")
-            pass
-
-        # Save the current state
-        saved_state = self.get_state()
-
-        results=[]
-        for i_sample in xrange(nsamples):
-            while True:
-            
-                # Set the values
-                for param in params:
-                    range = self._var_ranges[param]
-                    val = random.uniform(range[0], range[1])
-                    setattr(self, param, val)
-            
-                # Get the likelihood
-                lhood = self.likelihood()
-
-                # Throw the Monte-Carlo dice:
-                mc_val = random.uniform(0.0, 1.0)
-
-                if lhood > mc_val:
-                    break
-
-            point = {}
-            for param in params:
-                point[param] = getattr(self, param)
-
-            results.append(point)
-
-        self.set_state(**saved_state)
-        return results
-
-
-    def _check_value(self, val):
-        """ An internal method to check that a likelihood val is acceptable
-
-        """
-        if val <= 0.0:
-            self.log.error("Error: Likelihood evaluated to < 0: ", val)
-            raise Exception("LikelihoodEval")
-        if math.isnan(val):
-            self.log.error("Error: Likelihood value is NAN: ", val)
-            raise Exception("LikelihoodEval")
-        if math.isinf(val):
-            self.log.error("Error: Likelihood value is INF: ", val)
-            raise Exception("LikelihoodEval")
-        return
 
