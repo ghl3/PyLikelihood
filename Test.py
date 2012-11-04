@@ -5,7 +5,19 @@ from ConfidenceInterval import *
 
 import math
 
+from time import time
 
+def time_it(f):
+    def timed_function(*args, **kwargs):
+        begin = time()
+        # Run the original function
+        ret_val = f(*args, **kwargs)
+        end = time()
+        print "Function: ", f.__name__, "Time: ", end-begin
+        return ret_val
+    return timed_function
+
+@time_it
 def create_model():
 
     print "Creating Model"
@@ -19,13 +31,14 @@ def create_model():
     d = variable("d", 0, 20, 100)
     s = variable("s", 0, 20, 100)
     b = variable("b", 0, 20, 100)
+    b0 = variable("b0", 0, 20, 100)
 
     def pdf(d, s, b, b0=5.0, sigma=1.0):
         #return gauss(d, mu, 2.0)*gauss(mu0, mu, sigma)
         return pois(d, s+b)*gauss(b0, b, sigma)
 
     # Create the likelihood
-    model = likelihood(pdf, data=d, params=[s, b])
+    model = likelihood(pdf, data=d, params=[s, b, b0])
     model.logging.setLevel(logging.DEBUG)
 
     # Test the setting of parameters
@@ -35,6 +48,7 @@ def create_model():
     return model
 
 
+@time_it
 def print_model(model):
 
     print "Printing Model"
@@ -49,7 +63,7 @@ def print_model(model):
     model.eval(d=5)
     print model.norm
 
-
+@time_it
 def test_minimization(model, obs_data):
 
     print "Test Minimization"
@@ -63,6 +77,7 @@ def test_minimization(model, obs_data):
     print "Fitted Nll: ", nll_min
 
 
+@time_it
 def test_profile(model, obs_data):
 
     print "Test Profile"
@@ -100,6 +115,7 @@ def test_profile(model, obs_data):
     plt.clf()
 
 
+@time_it
 def test_data_plot(model):
 
     print "Test Data Plot"
@@ -113,6 +129,7 @@ def test_data_plot(model):
     plt.clf()
 
 
+@time_it
 def test_likelihood_plot(model, obs_data):
 
     print "Test Likelihood Plot"
@@ -136,6 +153,7 @@ def test_likelihood_plot(model, obs_data):
     plt.clf()
 
 
+@time_it
 def test_neyman(model, obs_data):
 
     print "Test Neyman"
@@ -164,6 +182,7 @@ def test_neyman(model, obs_data):
     #print "inverted Neyman data=14: ", model.invert_neyman(14, neyman)
 
 
+@time_it
 def test_data(model):
 
     print "Test data"
@@ -174,6 +193,7 @@ def test_data(model):
     print "Model Data by direct access: ", model.d
 
 
+@time_it
 def test_mc(model, obs_data):
 
     print "Test mc"
@@ -195,6 +215,7 @@ def test_mc(model, obs_data):
     plt.clf()
 
 
+@time_it
 def test_mcmc(model, obs_data):
 
     print "Test mcmc"
@@ -216,18 +237,51 @@ def test_mcmc(model, obs_data):
     plt.clf()
 
 
+@time_it
+def test_statistic_distribution(model):
+    
+    # Let the test statistic be the profile likelihood ratio
+
+    # Fit to the observed data
+    model.b = 5
+    model.s = 5
+
+    # Generate data samples under this model
+    #samples = model.sample_mcmc(['d'], 10000)
+    samples = model.sample_mc(['d'], 100)
+    #values = [point['d','b0'] for point in samples]
+    
+    # and plot the profile likelihood
+    plr_list = []
+    for point in samples:
+        model.b = random.uniform(4.8, 5.2)
+        model.s = random.uniform(4.8, 5.2)
+        model.d = point['d']
+        #model.b0 = point['b0']
+        prof_like = model.profile(poi="s", nuisance=['b'])
+        print "Profile Likelihood: ", prof_like
+        plr_list.append(prof_like)
+    print plr_list
+        
+    plt.clf()
+    plt.hist(plr_list, bins=50, range=[min(plr_list), max(plr_list)], normed=True)
+    plt.grid(True)
+    plt.savefig("profile_likelihood_distribution.pdf")
+    plt.clf()
+
+
 if __name__ == "__main__":
     model = create_model()
     print_model(model)
 
     obs_data = 7
 
-
-    #test_data(model)
+    test_data(model)
+    test_statistic_distribution(model)
     #test_data_plot(model)
     #test_likelihood_plot(model, obs_data)
     #test_minimization(model, obs_data)
     #test_neyman(model, obs_data)
     #test_profile(model, obs_data)
-    test_mc(model, obs_data)
-    test_mcmc(model, obs_data)
+    #test_mc(model, obs_data)
+    #test_mcmc(model, obs_data)
