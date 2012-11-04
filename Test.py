@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 
 import math
+import itertools
+import operator
 
 from Likelihood import *
 
@@ -41,8 +43,67 @@ def my_func(x, y):
     return math.exp(-1*(x-y)*(x-y))
     #return gauss(x, mu, sigma)
 
+def triple_gauss(x, y, z, mu=0, sigma=1):
+    return gauss(x,mu,sigma)*gauss(y,mu,sigma)*gauss(z,mu,sigma)
+
+
+def makeGrid(num_points, ranges):
+    """ Create a list of dimension 'dim' points on the unit cube
+    
+    dim = dimension of each vector (ie, the number of alpha's)
+    num_points = the number of points in each direction
+    min, max are the range of the box
+    
+    ranges  [(min1, max1), (min2, max2)...]
+
+    Each dimension has num_points that are equally separated
+    (0, 0, .2), (0, 0, .4), ...
+    (0, .2, 0), (0, .4, 0), ...
+    ...
+    
+    ps. itertools rocks
+    
+    """
+
+    # Make the list of deltas
+    deltas = [ (pair[1]-pair[0])/float(num_points-1) for pair in ranges]
+
+    # Create the iterator factory
+    def createGenerator(dx):
+        for j in xrange(num_points):
+            yield j*dx
+
+    # Make the list of iteratoers
+    iteraters = [createGenerator(dx) for dx in deltas]
+
+    # return itertools magic
+    return itertools.product( *iteraters )
+
 
 def main():
+
+
+    params = ["mu", "alpha_1", "alpha_2"]
+    npoints = 10
+    ranges = [(-5,5), (-5,5), (-5,5)]
+    volume = reduce(operator.mul, [(pair[1]-pair[0])/float(npoints) for pair in ranges] )
+    grid = makeGrid(npoints, ranges)
+
+    integral = 0.0
+    for point in grid:
+        #val = simple_likelihood(10, 8, point[0], point[1], 1, point[2], 2) 
+        val = triple_gauss(*point)
+        integral += val*volume
+
+    print integral
+    return
+                   
+
+    # Try normalizing the 'simple_likelihood'
+    #params = ["mu", "alpha_1", "alpha_2"]
+    #grid = makeGrid( len(params), .1, 
+
+    
 
     FORMAT = "%(message)s"
     logging.basicConfig(format=FORMAT)
@@ -71,7 +132,8 @@ def main():
     print "Scipy Integral: ", model.integral(2, 'mu')
 
     # Test the sampling
-    samples = model.sample(params=['mu'], nsamples=500, method='mcmc')
+    nsamples=500
+    samples = model.sample(params=['mu'], nsamples=nsamples, method='mcmc')
     lik_samples = [model.likelihood(**sample) for sample in samples]
     mu_samples = [sample['mu'] for sample in samples]
 
@@ -87,7 +149,7 @@ def main():
     y = [model.likelihood(mu=p) for p in points]
     plt.plot(points, y, label="likelihood")
     # Plot the histogram of samples
-    plt.hist(mu_samples, 100, normed=1, facecolor='g', alpha=0.75, label="sampled")
+    plt.hist(mu_samples, 100, normed=True, facecolor='g', alpha=0.75, label="sampled")
     plt.legend()
     plt.savefig("sample_test.pdf")    
 
