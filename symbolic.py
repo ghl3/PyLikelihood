@@ -1,4 +1,5 @@
 
+
 from scipy import integrate as sci_integrate
 from sympy import *
 
@@ -61,16 +62,19 @@ def main():
 
     on_off = poisson(d, s+b)*gauss(b0, b, sigma)
     print on_off
+
     print "Eval: "
     print N(on_off, subs={d:1, s:3, b:5, b0:5, sigma:1})
     #print N(on_off.evalf(subs={d:1, s:3, b:5, b0:5, sigma:1})
     return
+
 
     sym_norm = integrate(poisson(d, 5+3)*gauss(5, 5, 1.0), (d, 0, 100))
     print sym_norm
 
     norm = N(integrate(poisson(d, 5+3)*gauss(5, 5, 1.0), (d, 0, 100)))
     print norm
+
 
     pdf = create_model()
     data_min, data_max = (pdf.data.min, pdf.data.max)
@@ -91,6 +95,7 @@ def main():
 
     print "Symbolic: ", int_0_end-int_0_begin,
     print " Numeric: ", int_1_end-int_1_begin,
+
 
 
 if __name__ == "__main__":
