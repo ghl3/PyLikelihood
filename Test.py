@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 
-from ConfidenceInterval import *
+from Likelihood import *
 
 import math
 
@@ -17,26 +17,26 @@ def time_it(f):
         return ret_val
     return timed_function
 
+
+# Annoying boilerplate
+def pois(x, mu):
+    return poisson.pmf(math.floor(x), mu)
+def gauss(x, mu, sigma):
+    return norm.pdf(x, mu, sigma)
+def pdf(d, s, b, b0=5.0, sigma=1.0):
+    #return gauss(d, mu, 2.0)*gauss(mu0, mu, sigma)
+    return pois(d, s+b)*gauss(b0, b, sigma)
+
+
 @time_it
 def create_model():
 
     print "Creating Model"
 
-    # Annoying boilerplate
-    def pois(x, mu):
-        return poisson.pmf(math.floor(x), mu)
-    def gauss(x, mu, sigma):
-        return norm.pdf(x, mu, sigma)
-
     d = variable("d", 0, 20, 100)
     s = variable("s", 0, 20, 100)
     b = variable("b", 0, 20, 100)
     b0 = variable("b0", 0, 20, 100)
-
-    def pdf(d, s, b, b0=5.0, sigma=1.0):
-        #return gauss(d, mu, 2.0)*gauss(mu0, mu, sigma)
-        return pois(d, s+b)*gauss(b0, b, sigma)
-
     # Create the likelihood
     model = likelihood(pdf, data=d, params=[s, b, b0])
     model.logging.setLevel(logging.DEBUG)
