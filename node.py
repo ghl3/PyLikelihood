@@ -12,22 +12,16 @@ class node(object):
 
     """
 
-    _name = ""
-    _func = None
-
-    # graph properties
-    _children = {}
-    #_direct_variables = []
-    #_parents = []
-    #_child_name_map = {}
-
-    # caching properties
-    _var_values = {}
-    _cached_val=None
-    _tolerence = 1E-8
-    _dirty = True
-
     def __init__(self, name, func, child_map):
+        # graph properties
+        self._children = {}
+        
+        # caching properties
+        self._var_values = {}
+        self._cached_val=None
+        self._tolerence = 1E-8
+        self._dirty = True
+
         self._name = name
         func_spec = inspect.getargspec(func)
         (all_arguments, all_defaults) = (func_spec.args, func_spec.defaults)
@@ -49,6 +43,7 @@ class node(object):
                 print "Nodes: ", self._children
                 print "Required Function Args: ", all_arguments
                 raise Exception()
+        print "Setting Children: ", self._children
         self._func = func
 
     def _evaluate(self):
@@ -70,7 +65,7 @@ class node(object):
     
     def _requires_update(self):
         for name, child in self._children.iteritems():
-            print "Child: ", name, child, child.__class__.__name__
+            print "Child: %s=%s %s" % (name, child.name, child.__class__.__name__)
             if child.__class__.__name__ == 'variable': 
                 if self._var_values == {}: 
                     self._dirty=True
@@ -78,7 +73,8 @@ class node(object):
                 if abs(child.val - self._var_values[child.name]) > self._tolerence:
                     self._dirty=True
                     return True
-            if child._dirty:
-                self._dirty = True
-                return True
+            else:
+                if child._requires_update():
+                    self._dirty = True
+                    return True
                 
