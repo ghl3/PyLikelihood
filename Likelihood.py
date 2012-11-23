@@ -20,6 +20,9 @@ from scipy import optimize
 from math import log
 from math import ceil
 
+from variable import variable
+
+'''
 class variable(object):
     """ A class to store a name, value, and range
 
@@ -36,7 +39,7 @@ class variable(object):
         return np.linspace(self.min, self.max, self.num_points)
 
     pass
-
+'''
 
 class likelihood(object):
     """ A function which evaluates a pdf on data
