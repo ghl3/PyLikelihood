@@ -22,7 +22,7 @@ class node(object):
         self._tolerence = 1E-8
         self._dirty = True
 
-        self._name = name
+        self.name = name
         func_spec = inspect.getargspec(func)
         (all_arguments, all_defaults) = (func_spec.args, func_spec.defaults)
         '''
@@ -49,11 +49,13 @@ class node(object):
     def _evaluate(self):
         kwargs = {}
         for name, node in self._children.iteritems():
-            kwargs[name] = node.val
+            print "Getting value of node: ", name, node, node.__class__.__name__, node.getVal()
+            kwargs[name] = node.getVal()
         return self._func(**kwargs)
 
-    def val(self):
+    def getVal(self):
         if not self._requires_update():
+            print "Using cached val:"
             return self._cached_val
         value = self._evaluate()
         # cache the value
@@ -61,6 +63,7 @@ class node(object):
         for name, child in self._children.iteritems():
             if child.__class__.__name__ == 'variable':
                 self._var_values[child.name] = child.val
+        self._dirty=False
         return value
     
     def _requires_update(self):
@@ -77,4 +80,6 @@ class node(object):
                 if child._requires_update():
                     self._dirty = True
                     return True
-                
+        if self._dirty==True:
+            return True
+        
