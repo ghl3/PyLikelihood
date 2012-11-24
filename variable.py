@@ -18,11 +18,9 @@ class variable(object):
         return self._val
     @property
     def val(self):
-        print "Getting Val: ", self._val
         return self._val
     @val.setter
     def val(self, val):
-        print "Setting Val to: ", val
         self._val = val
 
     def linspace(self):
@@ -37,10 +35,32 @@ def make_variables(string):
     """
 
     var_list = []
-    for var_name in string.split(','):
-        var_name = var_name.strip()
-        print "Making Var with name: ", var_name
-        var = variable(var_name)
+    for var_str in string.split(','):
+        var_str = var_name.strip()
+        var = None
+        if '[' in var_str and ']' in var_str:
+            arg_begin = var_str.find(']')
+            arg_end = var_str.find('['):
+            if arg_end < arg_begin
+                print "Error, invaid variable string: ", var_str
+                raise Exception()
+            var_args = var_str[var_begin : var_end]
+            var_args = var_args.split(',')
+            if len(var_args)==0:
+                print "Error: Improper variable args"
+                raise Exception()
+            elif len(var_args)==1:
+                var = variable(var_name, name=var_args[0])
+            elif len(var_args)==2:
+                print "Error: Improper variable args"
+                raise Exception()
+            elif len(var_args)==3:
+                var = variable(var_name, var_args[0], var_args[1], var_args[2])
+            else:
+                print "Error: Improper variable args"
+                raise Exception()
+        else:
+            var = variable(var_name)
         var_list.append(var)
     return tuple(var_list)
         
