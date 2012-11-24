@@ -55,7 +55,7 @@ class node(object):
 
     def getVal(self):
         if not self._requires_update():
-            print "Using cached val:"
+            print "Using cached val for %s:" % self.name, self._cached_val
             return self._cached_val
         value = self._evaluate()
         # cache the value
@@ -68,7 +68,6 @@ class node(object):
     
     def _requires_update(self):
         for name, child in self._children.iteritems():
-            print "Child: %s=%s %s" % (name, child.name, child.__class__.__name__)
             if child.__class__.__name__ == 'variable': 
                 if self._var_values == {}: 
                     self._dirty=True
@@ -83,3 +82,11 @@ class node(object):
         if self._dirty==True:
             return True
         
+    def dependent_vars(self):
+        dep_vars = []
+        for name, node in self._children.iteritems():
+            if node.__class__.__name__ == "variable":
+                dep_vars.append(node)
+            else:
+                dep_vars.extend(node.dependent_vars())
+        return dep_vars
