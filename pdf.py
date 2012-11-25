@@ -37,32 +37,52 @@ class pdf(object):
     # Create an internal logger
     #logging = logging.getLogger("likelihood")
 
-    def __init__(self, func, data_vars=None, params=None):
+    def __init__(self, func, data, params=None):
 
         self._func = func
+        self._data = []
 
         # Normalization
         self.norm = 1.0
         self.normalization_cache = {}
         self.minimization_cache = {}
 
-        # Get all parameters of the function
+        # Always insist that we have data_vars supplied
+        if data==None or len(data)==0:
+            print "Error: No Data Vars Supplied"
+            raise Exception()
+
+        # Handle the special 'node' case
         if func.__class__.__name__ == "node":
-            all_arguments = [var.name for var in func.dependent_vars()]
+            
+            # Get all dependencies
+            all_arguments = func.dependent_vars()
+            
+            for var in data:
+                if var.__class__.__name__ == "variable":
+                    self._data.append(var)
+                else:
+                    var = func.var(var)
+                    self._data.append(var)
+            self._params = [var for var in all_arguments
+                            if var not in self._data]
+            
+        # If it is any other type of function
         else:
+            print "(For now) All pdf's must be made from nodes"
+            raise Exception()
+        '''
             func_spec = inspect.getargspec(func)
             (all_arguments, all_defaults) = (func_spec.args, func_spec.defaults)
 
-        if data_vars==None:
-            # We assume that the 0th argument is 'data'
-            # And we create a new variable to represent that argument
-            self._data_vars = [variable(all_arguments[0])]
-        else:
-            for var in data_vars:
-                if var.__class__.__name__ != "variable":
-                    print "Error: Suppied data must be a variable"
-                    raise Exception()
-            self._data_vars = data_vars
+            self._data = []
+            for var in data:
+                if var.__class__.__name__ == "variable":
+                    if var.name not in all_arguments:
+                        print "Error: Supplied data var: ", var.name
+                        print " does not match a function arugment for: ", func
+                        raise Exception()
+                    self._data.append(var)
 
         if params==None:
             self._params = [variable(arg) for arg in all_arguments[1:]]
@@ -77,13 +97,16 @@ class pdf(object):
         # argument is used only once
         for arg in all_arguments:
             if arg not in [var.name for var in self._params]:
-                if arg not in [var.name for var in self._data_vars]:
+                if arg not in [var.name for var in self._data]:
                     print "Error: Unhandled argument: ", arg
                     raise Exception()
             if arg in [var.name for var in self._params]:
-                if arg in [var.name for var in self._data_vars]:
+                if arg in [var.name for var in self._data]:
                     print "Error: Arg is set to be both data and a param ", arg
                     raise Exception()
+
+
+        '''
         pass
 
 
@@ -137,7 +160,8 @@ class pdf(object):
 
     
     def var(self, var_name):
-        for var in itertools.chain(self._params, self._data_vars):
+        for var in itertools.chain(self._params, self._data):
+            #print "Checking var: ", var, var.name
             if var.name == var_name:
                 return var
         print "Error: Didn't find variable: ", var_name,
