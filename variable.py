@@ -16,14 +16,16 @@ class variable(object):
 
     def getVal(self):
         return self.val
+
     '''
     @property
     def val(self):
         return self._val
     @val.setter
     def val(self, val):
-     self._val = val
+        self._val = val
     '''
+
     def linspace(self):
         return np.linspace(self.min, self.max, self.num_points)
 

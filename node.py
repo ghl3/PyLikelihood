@@ -23,7 +23,7 @@ class node(object):
         # caching properties
         self._var_values = {}
         self._cached_val=None
-        self._tolerence = 1E-8
+        self._tolerence = 0.00000001
         self._dirty = True
 
         func_spec = inspect.getargspec(func)
@@ -89,12 +89,13 @@ class node(object):
     
 
     def _requires_update(self):
+        if self._var_values == {}: 
+            self._dirty=True
+            return True
         for name, child in self._children.iteritems():
             if child.__class__.__name__ == 'variable': 
-                if self._var_values == {}: 
-                    self._dirty=True
-                    return True
                 if abs(child.val - self._var_values[child.name]) > self._tolerence:
+                    print "Requires update since var: %s changed" % name
                     self._dirty=True
                     return True
             else:

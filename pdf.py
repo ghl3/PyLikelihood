@@ -8,6 +8,9 @@ from variable import variable
 from scipy import integrate
 from scipy import optimize
 
+from math import log
+from math import ceil
+
 import logging
 logging.basicConfig()
 
@@ -34,10 +37,11 @@ class pdf(object):
     """
 
     # Create an internal logger
-    logging = logging.getLogger("likelihood")
+    logging = logging.getLogger("pdf")
 
     def __init__(self, func, data, params=None):
 
+        self.name = "pdf " + func.name
         self._func = func
         self._data = []
 
@@ -209,12 +213,18 @@ class pdf(object):
         at the current parameter point
         """
 
+        # Don't forget to restore the data
+        data_before = {}
+        for var in self._data:
+            data_before[var.name] = var.val
+
         # Check if the normalization has been cached
         # If so, return that cache
         norm_key = str(self.param_state().items())
         try:
             norm = self.normalization_cache[norm_key]
             self.norm = norm
+            print "Using Cached Normalization for %s: %s" % (self.name, norm)
             return norm
         except KeyError:
             pass
@@ -244,6 +254,11 @@ class pdf(object):
 
         self.logging.debug("Got Norm From Integral: %s from state: %s" % \
                                (self.norm, str(self.param_state())) )
+
+
+        # Restore the data values
+        for var in self._data:
+            var.val = data_before[var.name]
 
         return self.norm
 
@@ -301,37 +316,45 @@ class pdf(object):
             """
 
             for (param, val) in zip(params_to_fit, param_value_list):
-                setattr(self, param, val)
+                self.var(param).val = val
 
             # nll without normalization
             return -1*log(self._eval_raw())
 
 
-        def set_to_minimum(res):
-            min_values = res.x
-            for (param, val) in zip(params_to_fit, min_values):
-                param_min = getattr(self, param+"_var").min 
-                param_max = getattr(self, param+"_var").max
-                if val < param_min : val = param_min
-                if val > param_max : val = param_max
-                self.logging.debug("Minimized value of %s : %s" % (param, val))
-                setattr(self, param, val)
-
         # Get the initial guess
-        guess = [getattr(self, param) for param in params_to_fit]
+        guess = [self.var(param).val for param in params_to_fit]
 
         # Run the minimization
         bounds = []
         for param in params_to_fit:
-            param_min = getattr(self, param+"_var").min 
-            param_max = getattr(self, param+"_var").max
+            param_min = self.var(param).min
+            param_max = self.var(param).max
+            #param_min = getattr(self, param+"_var").min 
+            #param_max = getattr(self, param+"_var").max
             bounds.append( (param_min, param_max) )
-        res = optimize.minimize(nnl_for_min, guess, method="TNC", 
-                                bounds=bounds, tol=0.000001)
+        #res = optimize.minimize(nnl_for_min, guess, method="TNC", 
+        #                        bounds=bounds, tol=0.00000001)
+        res = optimize.minimize(nnl_for_min, guess, method="BFGS")
 
-        set_to_minimum(res)
 
         self.logging.debug("Successfully Minimized the function: " + str(res))
+        
+        # Take the result and set all parameters
+        def set_to_minimum(res):
+            min_values = res.x
+            for (param, val) in zip(params_to_fit, min_values):
+                param_min = self.var(param).min
+                param_max = self.var(param).max
+                #param_min = getattr(self, param+"_var").min 
+                #param_max = getattr(self, param+"_var").max
+                if val < param_min : val = param_min
+                if val > param_max : val = param_max
+                self.logging.debug("Minimized value of %s : %s" % (param, val))
+                #setattr(self, param, val)
+                self.var(param).val = val
+
+        set_to_minimum(res)
 
         # Cache the result
         self.minimization_cache[cache_key] = self.total_state()
