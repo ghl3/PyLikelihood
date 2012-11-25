@@ -51,9 +51,11 @@ class node(object):
 
     def _evaluate(self):
         kwargs = {}
+        print "Getting Value of Node: ",
         for name, node in self._children.iteritems():
-            print "Getting value of node: ", name, node, node.__class__.__name__, node.getVal()
+            print name, node.getVal(),
             kwargs[name] = node.getVal()
+        print ''
         return self._func(**kwargs)
 
 
@@ -70,7 +72,22 @@ class node(object):
         self._dirty=False
         return value
 
+
+    def set_state(self, **kwargs):
+        """ Set the state based on the values of the arguments
+        Return any args that aren't parameters of the likelihood
+        """
+        for (arg, val) in kwargs.iteritems():
+            self.var(arg).val = val
+
+
+    def __call__(self, **kwargs):
+        # Set values based on kwargs
+        # and then return the val
+        self.set_state(**kwargs)
+        return self.getVal()
     
+
     def _requires_update(self):
         for name, child in self._children.iteritems():
             if child.__class__.__name__ == 'variable': 

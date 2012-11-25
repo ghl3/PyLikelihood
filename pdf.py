@@ -5,12 +5,11 @@ import itertools
 from node import node
 from variable import variable
 
-'''
+from scipy import integrate
+from scipy import optimize
 
-THIS IS JUST A TEST, FOR NOW
-
-
-'''
+import logging
+logging.basicConfig()
 
 
 class pdf(object):
@@ -35,7 +34,7 @@ class pdf(object):
     """
 
     # Create an internal logger
-    #logging = logging.getLogger("likelihood")
+    logging = logging.getLogger("likelihood")
 
     def __init__(self, func, data, params=None):
 
@@ -110,7 +109,7 @@ class pdf(object):
         pass
 
 
-    def _eval_raw(self, data, **kwargs):
+    def _eval_raw(self):
         """ Get the current state of the likelihood
         without any normalization
 
@@ -118,17 +117,16 @@ class pdf(object):
         will take place after those kwargs are set
         """
 
-        self.set_state(**kwargs)
-        current_state = self.total_state()
-        #return self.pdf(self.get_data(), **current_state)
-        pdf_val = self.func(data, **current_state)
+        #self.set_state(**kwargs)
+        #current_state = self.total_state()
+        pdf_val = self._func()
         if pdf_val < 0:
             print "Error: Pdf is 0 at state: ", current_state
             raise Exception("PdfVal")
         return pdf_val
 
 
-    def eval(self, data, **kwargs):
+    def eval(self, **kwargs):
         """ Val of pdf based on the current state,
         Evaluated on the given data point
         This includes normalization, which is cached
@@ -147,7 +145,7 @@ class pdf(object):
         #current_data = self.get_data()
         self.normalize()
 
-        likelihood_val = self._eval_raw(data)*self.norm 
+        likelihood_val = self._eval_raw()*self.norm 
         if likelihood_val < 0:
             print "Error: Pdf is 0 at state: ", current_state
             raise Exception("PdfVal")
@@ -169,6 +167,43 @@ class pdf(object):
         raise Exception()
 
 
+    def total_state(self):
+        """ Return a dict with the current state including data and all parameters
+
+        """
+        current_state = {}
+        for param in self._params:
+            current_state[param.name] = self.var(param.name).val
+        for param in self._data:
+            current_state[param.name] = self.var(param.name).val
+        return current_state
+
+
+    def param_state(self):
+        """ Return a dict with the current state only the parameters
+
+        """
+        current_state = {}
+        print "In param_state, Params: ", self._params
+        for param in self._params:
+            current_state[param.name] = self.var(param.name).val
+        return current_state
+
+
+    def set_state(self, **kwargs):
+        """ Set the state based on the values of the arguments
+        Return any args that aren't parameters of the likelihood
+        """
+
+        for (arg, val) in kwargs.iteritems():
+            self.var(arg).val = val
+
+    def set_data(self, data):
+        """ This for now assumes only 1 data param
+        """
+        self._data[0].val = data
+
+
     def normalize(self):
         """ Integrate over the data
         at the current parameter point
@@ -186,12 +221,15 @@ class pdf(object):
 
         # To normalize, we integrate the 'raw' function
         # over data
-        def func_for_norm(data):
-            return self._eval_raw(data)
+        def func_for_norm(data_val):
+            self.set_data(data_val)
+            return self._eval_raw()
 
         # If not, integrate over the data, invert it, 
         # and store the cache
-        data_min, data_max = (self.data.min, self.data.max)
+        # ONE DATA VARIABLE FOR NOW
+        data_min, data_max = (self._data[0].min, self._data[0].max)
+
         #self.logging.debug("Integrating: " + str(self.param_state()))
         #integral, err = integrate.quad(self._eval_raw, data_min, data_max) 
         integral, err = integrate.quad(func_for_norm, data_min, data_max) 
