@@ -1,4 +1,7 @@
 
+import inspect
+import itertools
+
 from node import node
 from variable import variable
 
@@ -34,16 +37,54 @@ class pdf(object):
     # Create an internal logger
     #logging = logging.getLogger("likelihood")
 
-    def __init__(self, func, data_vars, params):
+    def __init__(self, func, data_vars=None, params=None):
 
         self._func = func
-        self._data_vars = data_vars
-        self._params = params
 
         # Normalization
         self.norm = 1.0
         self.normalization_cache = {}
         self.minimization_cache = {}
+
+        # Get all parameters of the function
+        if func.__class__.__name__ == "node":
+            all_arguments = [var.name for var in func.dependent_vars()]
+        else:
+            func_spec = inspect.getargspec(func)
+            (all_arguments, all_defaults) = (func_spec.args, func_spec.defaults)
+
+        if data_vars==None:
+            # We assume that the 0th argument is 'data'
+            # And we create a new variable to represent that argument
+            self._data_vars = [variable(all_arguments[0])]
+        else:
+            for var in data_vars:
+                if var.__class__.__name__ != "variable":
+                    print "Error: Suppied data must be a variable"
+                    raise Exception()
+            self._data_vars = data_vars
+
+        if params==None:
+            self._params = [variable(arg) for arg in all_arguments[1:]]
+        else:
+            for var in params:
+                if var.__class__.__name__ != "variable":
+                    print "Error: Suppied data must be a variable"
+                    raise Exception()
+            self._params = params
+
+        # Check that all arguments are used and that each
+        # argument is used only once
+        for arg in all_arguments:
+            if arg not in [var.name for var in self._params]:
+                if arg not in [var.name for var in self._data_vars]:
+                    print "Error: Unhandled argument: ", arg
+                    raise Exception()
+            if arg in [var.name for var in self._params]:
+                if arg in [var.name for var in self._data_vars]:
+                    print "Error: Arg is set to be both data and a param ", arg
+                    raise Exception()
+        pass
 
 
     def _eval_raw(self, data, **kwargs):
@@ -93,6 +134,15 @@ class pdf(object):
     # Make the class callable:
     def __call__(self, *args, **kwargs):
         return self.eval(*args, **kwargs)
+
+    
+    def var(self, var_name):
+        for var in itertools.chain(self._params, self._data_vars):
+            if var.name == var_name:
+                return var
+        print "Error: Didn't find variable: ", var_name,
+        print " in pdf: ", self.name
+        raise Exception()
 
 
     def normalize(self):

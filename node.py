@@ -13,6 +13,10 @@ class node(object):
     """
 
     def __init__(self, name, func, child_map):
+
+        self.name = name
+        self._func = func
+
         # graph properties
         self._children = {}
         
@@ -22,7 +26,6 @@ class node(object):
         self._tolerence = 1E-8
         self._dirty = True
 
-        self.name = name
         func_spec = inspect.getargspec(func)
         (all_arguments, all_defaults) = (func_spec.args, func_spec.defaults)
         '''
@@ -44,7 +47,7 @@ class node(object):
                 print "Required Function Args: ", all_arguments
                 raise Exception()
         print "Setting Children: ", self._children
-        self._func = func
+
 
     def _evaluate(self):
         kwargs = {}
@@ -52,6 +55,7 @@ class node(object):
             print "Getting value of node: ", name, node, node.__class__.__name__, node.getVal()
             kwargs[name] = node.getVal()
         return self._func(**kwargs)
+
 
     def getVal(self):
         if not self._requires_update():
@@ -65,6 +69,7 @@ class node(object):
                 self._var_values[child.name] = child.val
         self._dirty=False
         return value
+
     
     def _requires_update(self):
         for name, child in self._children.iteritems():
@@ -81,6 +86,7 @@ class node(object):
                     return True
         if self._dirty==True:
             return True
+
         
     def dependent_vars(self):
         dep_vars = []
@@ -90,3 +96,14 @@ class node(object):
             else:
                 dep_vars.extend(node.dependent_vars())
         return dep_vars
+
+
+    def var(self, var_name):
+        for var in self.dependent_vars():
+            if var.name == var_name:
+                return var
+        print "Error: Didn't find variable: ", var_name,
+        print " in node: ", self.name
+        raise Exception()
+
+            
