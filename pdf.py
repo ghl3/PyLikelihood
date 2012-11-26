@@ -39,7 +39,17 @@ class pdf(object):
     # Create an internal logger
     logging = logging.getLogger("pdf")
 
-    def __init__(self, func, data, params=None):
+    def __init__(self, func, data):
+        """ Create a pdf from a function
+
+        The function must be an instance of a 'node' class
+
+        In the construction, one must specify which variables
+        are to be interpreted as data.  This can be done by
+        supplying a list of variables or a string list of their
+        names.
+
+        """
 
         self.name = "pdf " + func.name
         self._func = func
@@ -56,73 +66,30 @@ class pdf(object):
             raise Exception()
 
         # Handle the special 'node' case
-        if func.__class__.__name__ == "node":
-            
-            # Get all dependencies
-            all_arguments = func.dependent_vars()
-            
-            for var in data:
-                if var.__class__.__name__ == "variable":
-                    self._data.append(var)
-                else:
-                    var = func.var(var)
-                    self._data.append(var)
-            self._params = [var for var in all_arguments
-                            if var not in self._data]
-            
-        # If it is any other type of function
-        else:
+        if func.__class__.__name__ != "node":
             print "(For now) All pdf's must be made from nodes"
             raise Exception()
-        '''
-            func_spec = inspect.getargspec(func)
-            (all_arguments, all_defaults) = (func_spec.args, func_spec.defaults)
-
-            self._data = []
-            for var in data:
-                if var.__class__.__name__ == "variable":
-                    if var.name not in all_arguments:
-                        print "Error: Supplied data var: ", var.name
-                        print " does not match a function arugment for: ", func
-                        raise Exception()
-                    self._data.append(var)
-
-        if params==None:
-            self._params = [variable(arg) for arg in all_arguments[1:]]
-        else:
-            for var in params:
-                if var.__class__.__name__ != "variable":
-                    print "Error: Suppied data must be a variable"
-                    raise Exception()
-            self._params = params
-
-        # Check that all arguments are used and that each
-        # argument is used only once
-        for arg in all_arguments:
-            if arg not in [var.name for var in self._params]:
-                if arg not in [var.name for var in self._data]:
-                    print "Error: Unhandled argument: ", arg
-                    raise Exception()
-            if arg in [var.name for var in self._params]:
-                if arg in [var.name for var in self._data]:
-                    print "Error: Arg is set to be both data and a param ", arg
-                    raise Exception()
-
-
-        '''
+            
+        # Get all dependencies
+        all_arguments = func.dependent_vars()
+        for var in data:
+            if var.__class__.__name__ == "variable":
+                self._data.append(var)
+            else:
+                var = func.var(var)
+                self._data.append(var)
+        self._params = [var for var in all_arguments
+                        if var not in self._data]
         pass
 
 
     def _eval_raw(self):
-        """ Get the current state of the likelihood
-        without any normalization
+        """ Get the current value of the pdf w/o normalization
 
-        Any values can be set via kwargs, and the evaluation
-        will take place after those kwargs are set
+        This will use all current values of the dependent
+        variables and the data.
         """
 
-        #self.set_state(**kwargs)
-        #current_state = self.total_state()
         pdf_val = self._func()
         if pdf_val < 0:
             print "Error: Pdf is 0 at state: ", current_state
@@ -131,28 +98,25 @@ class pdf(object):
 
 
     def eval(self, **kwargs):
-        """ Val of pdf based on the current state,
-        Evaluated on the given data point
-        This includes normalization, which is cached
+        """ Get the current value of the pdf
 
-        The current state can be set via kwargs, and
-        the normalization will take place after the
-        current state is set.
-
+        This value is determined by evaluating the
+        pdf function on the current state of parameters
+        and data, including normalization over all data.
+        
+        The values of parameters or data can be set
+        by specifying their values as keyword args.
         """
+
         self.set_state(**kwargs)
 
-        # We have to normalize, but we should be sure
-        # to restore the state after, so we aren't effected
-        # by the random data points used to evaluate the integral
-        #current_state = self.total_state()
-        #current_data = self.get_data()
         self.normalize()
 
         likelihood_val = self._eval_raw()*self.norm 
         if likelihood_val < 0:
-            print "Error: Pdf is 0 at state: ", current_state
-            raise Exception("PdfVal")
+            print "Error: Pdf evaluates to <0 at state: ", current_state
+            raise Exception("Pdf val is negative")
+
         return likelihood_val
 
 
@@ -162,24 +126,30 @@ class pdf(object):
 
     
     def var(self, var_name):
+        """ Return the dependent var by name
+
+        """
+
         for var in itertools.chain(self._params, self._data):
-            #print "Checking var: ", var, var.name
             if var.name == var_name:
                 return var
-        print "Error: Didn't find variable: ", var_name,
-        print " in pdf: ", self.name
-        raise Exception()
+
+        # If we get here, then we didn't find the variable
+        print "Error: Didn't find variable: %s in pdf: %s" % (var_name, self.name)
+        raise KeyError("Variable %s not found" % var_name)
 
 
     def total_state(self):
-        """ Return a dict with the current state including data and all parameters
+        """ Return a dict with the current state of all variables
 
+        This includes both parameters and data variables
         """
+
         current_state = {}
-        for param in self._params:
+        for param in itertools.chain(self._params, self._data):
             current_state[param.name] = self.var(param.name).val
-        for param in self._data:
-            current_state[param.name] = self.var(param.name).val
+        #for param in self._data:
+        #    current_state[param.name] = self.var(param.name).val
         return current_state
 
 
@@ -188,35 +158,62 @@ class pdf(object):
 
         """
         current_state = {}
-        print "In param_state, Params: ", self._params
         for param in self._params:
             current_state[param.name] = self.var(param.name).val
         return current_state
 
 
     def set_state(self, **kwargs):
-        """ Set the state based on the values of the arguments
-        Return any args that aren't parameters of the likelihood
+        """ Set the state based on the supplied keyword args
+
+        It will throw an exception if any unknown variables
+        are attempted to be set
         """
 
         for (arg, val) in kwargs.iteritems():
             self.var(arg).val = val
 
+
     def set_data(self, data):
-        """ This for now assumes only 1 data param
+        """ Set the value of the data parameter(s)
+
+        This takes either a single val, a list, 
+        or a dictionary
         """
-        self._data[0].val = data
+
+        # Dictioanry
+        try:
+            for var, val in data.iteritems():
+                var.val = val
+            return
+        except AttributeError:
+            pass
+
+        # List
+        try:
+            for var, val in zip(self._data, data):
+                var.val = val
+            return
+        except TypeError:
+            pass
+        
+        # Single entry
+        if len(self._data)==1:
+            self._data[0].val = data
+            return
+
+        # If we get here, we failed pretty hard
+        print "Error: Cannot set data based on input: ", data
+        raise Exception()
 
 
     def normalize(self):
-        """ Integrate over the data
-        at the current parameter point
-        """
+        """ Determine the integral of the pdf over data
 
-        # Don't forget to restore the data
-        data_before = {}
-        for var in self._data:
-            data_before[var.name] = var.val
+        This integral is evaluated over all data variables
+        and is evaluated at the current state of all parameters.
+        Normalization integrals are cached.
+        """
 
         # Check if the normalization has been cached
         # If so, return that cache
@@ -229,21 +226,37 @@ class pdf(object):
         except KeyError:
             pass
 
+        # We have to normalize, but we should be sure
+        # to restore the state after, so we aren't effected
+        # by the random data points used to evaluate the integral
+        data_before = {var.name : var.val for var in self._data}
+        #for var in self._data:
+        #    data_before[var.name] = var.val
+
         # To normalize, we integrate the 'raw' function
         # over data
-        def func_for_norm(data_val):
-            self.set_data(data_val)
-            return self._eval_raw()
 
-        # If not, integrate over the data, invert it, 
-        # and store the cache
-        # ONE DATA VARIABLE FOR NOW
-        data_min, data_max = (self._data[0].min, self._data[0].max)
+        if len(self._data)==1:
+            def func_for_norm(data_val):
+                self._data[0].val = data_val
+                return self._eval_raw()
+            data_min, data_max = (self._data[0].min, self._data[0].max)
+            integral, err = integrate.quad(func_for_norm, data_min, data_max) 
+            self.norm = 1.0 / integral
 
-        #self.logging.debug("Integrating: " + str(self.param_state()))
-        #integral, err = integrate.quad(self._eval_raw, data_min, data_max) 
-        integral, err = integrate.quad(func_for_norm, data_min, data_max) 
-        self.norm = 1.0 / integral
+        elif len(self._data)==2:
+            def func_for_norm(data1_val, data0_val):
+                self._data[0].val = data0_val
+                self._data[1].val = data1_val
+                return self._eval_raw()
+            data0_min, data0_max = (self._data[0].min, self._data[0].max)
+            data1_min, data1_max = (self._data[1].min, self._data[1].max)
+            integral, err = integrate.dblquad(func_for_norm, data0_min, data0_max,
+                                              lambda x: data1_min, lambda x: data1_max)
+            self.norm = 1.0 / integral
+        
+        else:
+            raise Exception("Data of dim > 2 not currently handled")
 
         if self.norm <= 0:
             print "Error: Normalization is <= 0"
@@ -254,7 +267,6 @@ class pdf(object):
 
         self.logging.debug("Got Norm From Integral: %s from state: %s" % \
                                (self.norm, str(self.param_state())) )
-
 
         # Restore the data values
         for var in self._data:
@@ -283,6 +295,14 @@ class pdf(object):
         self.logging.debug( "Minimizing: " + str(params_to_fit) 
                             + " on state: " + str(self.total_state()))
 
+        # Minimize the supplied params
+        if len(params_to_fit)==0:
+            print "Error: No Paramaterize to Minimize"
+            raise Exception("FitTo")
+
+        # Set the value of the data to the supplied data
+        self.set_data(data)
+
         # NOT YET IMPLEMENTED
         # Create a key based on the values of the params to not minimize
         # and the list of params to minimize (possibly overkill, but whatevs)
@@ -290,21 +310,12 @@ class pdf(object):
         constant_params = [item for item in self.param_state().items() 
                            if item[0] not in params_to_fit]
 
-        cache_key = (data, frozenset(constant_params), frozenset(params_to_fit))
+        cache_key = (tuple(self._data), frozenset(constant_params), frozenset(params_to_fit))
         if cache_key in self.minimization_cache:
             state = self.minimization_cache[cache_key] 
             print "Using fitTo Cache: ", state
             self.set_state(**state)
             return
-
-        # Minimize the supplied params
-        if len(params_to_fit)==0:
-            print "Error: No Paramaterize to Minimize"
-            raise Exception("FitTo")
-            return
-
-        # Set the value of the data to the supplied data
-        self.set_data(data)
 
         #current_state = self.total_state()
         self.normalize()
