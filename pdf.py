@@ -230,12 +230,8 @@ class pdf(object):
         # to restore the state after, so we aren't effected
         # by the random data points used to evaluate the integral
         data_before = {var.name : var.val for var in self._data}
-        #for var in self._data:
-        #    data_before[var.name] = var.val
 
-        # To normalize, we integrate the 'raw' function
-        # over data
-
+        # Do the numeric normalization
         if len(self._data)==1:
             def func_for_norm(data_val):
                 self._data[0].val = data_val
@@ -255,7 +251,7 @@ class pdf(object):
                                               lambda x: data1_min, lambda x: data1_max)
             self.norm = 1.0 / integral
         
-        else:
+        else: 
             raise Exception("Data of dim > 2 not currently handled")
 
         if self.norm <= 0:
@@ -303,13 +299,13 @@ class pdf(object):
         # Set the value of the data to the supplied data
         self.set_data(data)
 
-        # NOT YET IMPLEMENTED
-        # Create a key based on the values of the params to not minimize
-        # and the list of params to minimize (possibly overkill, but whatevs)
-        # as well as the data being minimized
+        # Get the set of parameters that are constant in the fit
         constant_params = [item for item in self.param_state().items() 
                            if item[0] not in params_to_fit]
 
+        # Create a key based on the values of the params to not minimize
+        # and the list of params to minimize, as well as the data being minimized.
+        # Use this key to store the value of the normalization in the cache
         cache_key = (tuple(self._data), frozenset(constant_params), frozenset(params_to_fit))
         if cache_key in self.minimization_cache:
             state = self.minimization_cache[cache_key] 
@@ -317,21 +313,17 @@ class pdf(object):
             self.set_state(**state)
             return
 
-        #current_state = self.total_state()
+        # Be sure to normalize
         self.normalize()
-
+        
         # Create the function for minimization
+        # We here use the 'eval_raw' method.
+        # Do we need to include normalization if
+        # we're looking for the minimum?
         def nnl_for_min(param_value_list):
-            """ Create the wrapper function for scipy.optimize
-
-            """
-
             for (param, val) in zip(params_to_fit, param_value_list):
                 self.var(param).val = val
-
-            # nll without normalization
             return -1*log(self._eval_raw())
-
 
         # Get the initial guess
         guess = [self.var(param).val for param in params_to_fit]
@@ -341,14 +333,8 @@ class pdf(object):
         for param in params_to_fit:
             param_min = self.var(param).min
             param_max = self.var(param).max
-            #param_min = getattr(self, param+"_var").min 
-            #param_max = getattr(self, param+"_var").max
             bounds.append( (param_min, param_max) )
-        #res = optimize.minimize(nnl_for_min, guess, method="TNC", 
-        #                        bounds=bounds, tol=0.00000001)
         res = optimize.minimize(nnl_for_min, guess, method="BFGS")
-
-
         self.logging.debug("Successfully Minimized the function: " + str(res))
         
         # Take the result and set all parameters
@@ -365,6 +351,7 @@ class pdf(object):
                 #setattr(self, param, val)
                 self.var(param).val = val
 
+        # Note sure why I made this a separate function...?
         set_to_minimum(res)
 
         # Cache the result
