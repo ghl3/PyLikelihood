@@ -164,6 +164,45 @@ class node(object):
         raise Exception()
 
 
+    def integration_method(self, vars_to_integrate):
+        """ Return a list of variables to integrate
+        
+        Return also a function representing a way
+        to combine them:
+
+        return (func, [varsA, varsB, ...])
+
+        Where the integral is defined to be:
+        integral = func( integral(varsA), integral(varsB)...)
+
+        For a generic node, all we can do is return
+        the given list of variables and the identity function.
+        """
+
+        def identity(x):
+            return x
+
+        return (identity, [vars_to_integrate])
+
+
+    def integral(self, vars_to_integrate):
+        """ A smart integral that attempts to divide and conquor
+
+        This integration method 
+        """
+
+        (func, var_list) = self.integration_method(vars_to_integrate)
+        
+        if len(var_list) > 2:
+            print "Error: Cannot do numeric integrals for >2 vars"
+            print "Requested integrals: ", var_list
+            raise Exception()
+
+        integral_list = [self._numeric_integral(vars) for vars in var_list]
+
+        return func(*integral_list)
+
+
     def __add__(self, other):
         """ Return the sum of two nodes
 
