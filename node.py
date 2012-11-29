@@ -162,6 +162,30 @@ class node(object):
 
 
     def _numeric_integral(self, vars_to_integrate):
+        """ Numerically integrate this node over the given vars
+
+        This will not change the value of the vars after the
+        integral has been done (their initial values are restored).
+
+        We specifically handle the case where this node doesn't
+        depened on any specified variables by multiplying
+        over those variable's ranges.
+
+        """
+        
+        dep_vars = self.dependent_vars()
+        non_dep_vars = [var for var in vars_to_integrate
+                        if var not in dep_vars]
+
+        # Handle the case where we integrate over some
+        # variables that this node doesn't depend on
+        if len(non_dep_vars) != 0:
+            dep_vars_to_integrate = [var for var in vars_to_integrate
+                                     if var in dep_vars]
+            non_dep_integral = 1.0
+            for var in non_dep_vars:
+                non_dep_integral *= (var.max - var.min)
+            return non_dep_integral * self._numeric_integral(dep_vars_to_integrate)
 
         # We have to normalize, but we should be sure
         # to restore the state after, so we aren't effected
@@ -262,6 +286,38 @@ class product_node(node):
         def node_product(a, b):
             return a * b
         node.__init__(self, name, node_product, [nodeA, nodeB])
+
+
+        def integral(self, *vars_to_integrate):
+            """ Return a smart integrate of a product
+
+            There are two cases:
+              - If the variables are 
+
+            """
+
+            dep_vars0 = self.children[0].dependent_vars()
+            dep_vars1 = self.children[1].dependent_vars()
+            
+            vars_to_integrate_0_only = [var for var in vars_to_integrate
+                                        if var in dep_vars0 
+                                        and var not in dep_vars1]
+            
+            vars_to_integrate_1_only = [var for var in vars_to_integrate
+                                        if var in dep_vars1 
+                                        and var not in dep_vars0]
+            
+            vars_for_both = [var for var in vars_to_integrate
+                             if var in dep_vars0
+                             and var in dep_vars1]
+
+            if len(vars_for_both) != 0:
+                return self._numeric_integral(vars_to_integrate)
+
+            else:
+                int0 = children[0].integrate(*vars_to_integrate_0_only)
+                int1 = children[1].integrate(*vars_to_integrate_1_oly)
+                return int0*int1
 
 
 class diff_node(node):
