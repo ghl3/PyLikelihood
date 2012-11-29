@@ -2,7 +2,10 @@
 
 RUNTEST=python -m unittest -v -b
 
-all: test_node test_pdf test_arithmetic
+ALLMODULES=$(patsubst %.py, %, $(wildcard test_*.py)) 
 
-% : %.py
-	${RUNTEST} $@
+all: 
+	${RUNTEST} ${ALLMODULES}
+
+% : test_%.py
+	${RUNTEST} test_$@
