@@ -8,6 +8,13 @@ from pdf import pdf
 import unittest
 
 
+def gauss(x, mu, sigma):
+    return norm.pdf(x, mu, sigma)
+
+def invariant_mass(a, b):
+    return sqrt(a*a + b*b)
+
+
 class TestIntegral(unittest.TestCase):
     
     
@@ -28,5 +35,5 @@ class TestIntegral(unittest.TestCase):
     def test_1d_int(self):
         
         (x0, mu0, sigma0, x1, mu1, sigma1) = self.vars
-        self.node.integrate(x0)
+        self.node.integral(x0)
         

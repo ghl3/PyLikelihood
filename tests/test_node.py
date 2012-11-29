@@ -7,8 +7,14 @@ from pdf import pdf
 
 import unittest
 
+
 def gauss(x, mu, sigma):
     return norm.pdf(x, mu, sigma)
+
+
+def invariant_mass(a, b):
+    return sqrt(a*a + b*b)
+
 
 def make_node():
     
@@ -26,10 +32,6 @@ def make_node():
     inv_mass = node("inv_mass", invariant_mass, {"a": mass0, "b":mass1})
     
     return inv_mass
-
-
-def invariant_mass(a, b):
-    return sqrt(a*a + b*b)
 
 
 class TestNode(unittest.TestCase):

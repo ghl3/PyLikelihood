@@ -4,8 +4,7 @@ import itertools
 
 from node import node, variable
 
-from scipy import integrate
-from scipy import optimize
+import scipy
 
 from math import log
 from math import ceil
@@ -236,7 +235,7 @@ class pdf(object):
                 self._data[0].val = data_val
                 return self._eval_raw()
             data_min, data_max = (self._data[0].min, self._data[0].max)
-            integral, err = integrate.quad(func_for_norm, data_min, data_max) 
+            integral, err = scipy.integrate.quad(func_for_norm, data_min, data_max) 
             self.norm = 1.0 / integral
 
         elif len(self._data)==2:
@@ -246,7 +245,7 @@ class pdf(object):
                 return self._eval_raw()
             data0_min, data0_max = (self._data[0].min, self._data[0].max)
             data1_min, data1_max = (self._data[1].min, self._data[1].max)
-            integral, err = integrate.dblquad(func_for_norm, data0_min, data0_max,
+            integral, err = scipy.integrate.dblquad(func_for_norm, data0_min, data0_max,
                                               lambda x: data1_min, lambda x: data1_max)
             self.norm = 1.0 / integral
         
@@ -333,7 +332,7 @@ class pdf(object):
             param_min = self.var(param).min
             param_max = self.var(param).max
             bounds.append( (param_min, param_max) )
-        res = optimize.minimize(nnl_for_min, guess, method="BFGS")
+        res = scipy.optimize.minimize(nnl_for_min, guess, method="BFGS")
         self.logging.debug("Successfully Minimized the function: " + str(res))
         
         # Take the result and set all parameters

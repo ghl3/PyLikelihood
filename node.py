@@ -3,6 +3,8 @@
 from __future__ import division
 
 import inspect
+
+import scipy
 import numpy as np
 
 
@@ -175,10 +177,10 @@ class node(object):
         if len(vars_to_integrate)==1:
             var_to_integrate = vars_to_integrate[0]
             def func_for_int(var_val):
-                self.var(var_to_integrate).val = var_val
+                var_to_integrate.val = var_val
                 return self._evaluate()
             var_min, var_max = (var_to_integrate.min, var_to_integrate.max)
-            integral, err = integrate.quad(func_for_int, var_min, var_max) 
+            integral, err = scipy.integrate.quad(func_for_int, var_min, var_max) 
             return integral
 
         elif len(vars_to_integrate)==2:
@@ -190,7 +192,7 @@ class node(object):
                 return self._evaluate()
             var0_min, var0_max = (var0.min, var0.max)
             var1_min, var1_max = (var1.min, var1.max)
-            integral, err = integrate.dblquad(func_for_int, var0_min, var0_max,
+            integral, err = scipy.integrate.dblquad(func_for_int, var0_min, var0_max,
                                               lambda x: var1_min, lambda x: var1_max)
             return integral
         
@@ -204,16 +206,7 @@ class node(object):
         This integration method 
         """
 
-        (func, var_list) = self.integration_method(vars_to_integrate)
-        
-        if len(var_list) > 2:
-            print "Error: Cannot do numeric integrals for >2 vars"
-            print "Requested integrals: ", var_list
-            raise Exception()
-
-        integral_list = [self._numeric_integral(vars) for vars in var_list]
-
-        return func(*integral_list)
+        return self._numeric_integral(vars_to_integrate)
 
 
     def __add__(self, other):
