@@ -87,7 +87,7 @@ class node(object):
                 print "Nodes: ", self._children
                 print "Required Function Args: ", all_arguments
                 raise Exception()
-        print "Setting Children: ", self._children
+        pass
 
 
     def _evaluate(self):
@@ -185,7 +185,10 @@ class node(object):
             non_dep_integral = 1.0
             for var in non_dep_vars:
                 non_dep_integral *= (var.max - var.min)
-            return non_dep_integral * self._numeric_integral(dep_vars_to_integrate)
+            if len(dep_vars_to_integrate)==0:
+                return non_dep_integral * self.getVal()
+            else:
+                return non_dep_integral * self._numeric_integral(dep_vars_to_integrate)
 
         # We have to normalize, but we should be sure
         # to restore the state after, so we aren't effected
@@ -193,7 +196,11 @@ class node(object):
         vars_before = {var.name : var.val for var in vars_to_integrate}
 
         # Do the numeric normalization
-        if len(vars_to_integrate)==1:
+        if len(vars_to_integrate)==0:
+            print "Error: No variables supplied for integration"
+            raise Exception("IntegralDimension")
+
+        elif len(vars_to_integrate)==1:
             var_to_integrate = vars_to_integrate[0]
             def func_for_int(var_val):
                 var_to_integrate.val = var_val
@@ -212,11 +219,36 @@ class node(object):
             var0_min, var0_max = (var0.min, var0.max)
             var1_min, var1_max = (var1.min, var1.max)
             integral, err = scipy.integrate.dblquad(func_for_int, var0_min, var0_max,
-                                              lambda x: var1_min, lambda x: var1_max)
+                                                    lambda x: var1_min, lambda x: var1_max)
             return integral
+
+        elif len(vars_to_integrate)==3:
+            var0 = vars_to_integrate[0]
+            var1 = vars_to_integrate[1]
+            var2 = vars_to_integrate[2]
+            def func_for_int(var2_val, var1_val, var0_val):
+                var0.val = var0_val
+                var1.val = var1_val
+                var2.val = var2_val
+                return self._evaluate()
+            var0_min, var0_max = (var0.min, var0.max)
+            var1_min, var1_max = (var1.min, var1.max)
+            var2_min, var2_max = (var2.min, var2.max)
+            def lower_bound_2(x, y):
+                return var2_min
+            def upper_bound_2(x, y):
+                return var2_max
+            integral, err = scipy.integrate.tplquad(func_for_int, var0_min, var0_max,
+                                                    lambda x: var1_min, lambda x: var1_max,
+                                                    lower_bound_2, upper_bound_2)
+            return integral
+
         
         else: 
-            raise Exception("Data of dim > 2 not currently handled")
+            print "Error: Cannot yet integrate over >2 dimensions"
+            print "Attempting to integrate over: "
+            print [(var, var.name) for var in vars_to_integrate]
+            raise Exception("IntegralDimension")
 
 
     def integral(self, *vars_to_integrate):
