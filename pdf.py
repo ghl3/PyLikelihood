@@ -2,8 +2,7 @@
 import inspect
 import itertools
 
-from node import node
-from variable import variable
+from node import node, variable
 
 from scipy import integrate
 from scipy import optimize

@@ -2,8 +2,7 @@
 
 from pdf import pdf
 
-from node import node
-from variable import make_variables
+from node import *
 from test_node import gauss, make_node, invariant_mass
 
 import logging

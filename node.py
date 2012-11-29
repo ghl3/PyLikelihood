@@ -198,7 +198,7 @@ class node(object):
             raise Exception("Data of dim > 2 not currently handled")
 
 
-    def integral(self, vars_to_integrate):
+    def integral(self, *vars_to_integrate):
         """ A smart integral that attempts to divide and conquor
 
         This integration method 

@@ -2,7 +2,6 @@
 from math import sqrt
 from scipy.stats import norm
 
-#from variable import *
 from node import *
 from pdf import pdf
 

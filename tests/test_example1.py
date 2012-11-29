@@ -3,7 +3,6 @@
 from math import sqrt, exp, factorial
 from scipy.stats import norm
 
-from variable import *
 from node import *
 from pdf import pdf
 
