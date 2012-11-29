@@ -164,25 +164,38 @@ class node(object):
         raise Exception()
 
 
-    def integration_method(self, vars_to_integrate):
-        """ Return a list of variables to integrate
+    def _numeric_integral(self, vars_to_integrate):
+
+        # We have to normalize, but we should be sure
+        # to restore the state after, so we aren't effected
+        # by the random data points used to evaluate the integral
+        vars_before = {var.name : var.val for var in vars_to_integrate}
+
+        # Do the numeric normalization
+        if len(vars_to_integrate)==1:
+            var_to_integrate = vars_to_integrate[0]
+            def func_for_int(var_val):
+                self.var(var_to_integrate).val = var_val
+                return self._evaluate()
+            var_min, var_max = (var_to_integrate.min, var_to_integrate.max)
+            integral, err = integrate.quad(func_for_int, var_min, var_max) 
+            return integral
+
+        elif len(vars_to_integrate)==2:
+            var0 = self.var(vars_to_integrate[0])
+            var1 = self.var(vars_to_integrate[1])
+            def func_for_int(var1_val, var0_val):
+                var0.val = var0_val
+                var1.val = var1_val
+                return self._evaluate()
+            var0_min, var0_max = (var0.min, var0.max)
+            var1_min, var1_max = (var1.min, var1.max)
+            integral, err = integrate.dblquad(func_for_int, var0_min, var0_max,
+                                              lambda x: var1_min, lambda x: var1_max)
+            return integral
         
-        Return also a function representing a way
-        to combine them:
-
-        return (func, [varsA, varsB, ...])
-
-        Where the integral is defined to be:
-        integral = func( integral(varsA), integral(varsB)...)
-
-        For a generic node, all we can do is return
-        the given list of variables and the identity function.
-        """
-
-        def identity(x):
-            return x
-
-        return (identity, [vars_to_integrate])
+        else: 
+            raise Exception("Data of dim > 2 not currently handled")
 
 
     def integral(self, vars_to_integrate):
