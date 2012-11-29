@@ -22,28 +22,10 @@ from math import ceil
 
 from variable import variable
 
-'''
-class variable(object):
-    """ A class to store a name, value, and range
-
-    """
-
-    def __init__(self, name, var_min=-np.inf, var_max=np.inf, num_points=1000):
-        self.name = name
-        self.min = var_min
-        self.max = var_max
-        self.num_points = num_points
-        #self.val = 0.0
-
-    def linspace(self):
-        return np.linspace(self.min, self.max, self.num_points)
-
-    pass
-'''
 
 class likelihood(object):
-    """ A function which evaluates a pdf on data
-
+    """ A function which evaluates a pdf on data.
+    
     A likelihood class takes a pdf: pdf(data, *params)
     One can specify the data argument and the various
     parameters by name, or by supplying 'variables'

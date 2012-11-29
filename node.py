@@ -1,7 +1,9 @@
 
+# cause, duh:
+from __future__ import division
+
 import inspect
 from variable import variable
-
 
 class node(object):
     """ An node in an acyclic graph
@@ -12,7 +14,7 @@ class node(object):
 
     """
 
-    def __init__(self, name, func, child_map):
+    def __init__(self, name, func, children):
 
         self.name = name
         self._func = func
@@ -28,16 +30,23 @@ class node(object):
 
         func_spec = inspect.getargspec(func)
         (all_arguments, all_defaults) = (func_spec.args, func_spec.defaults)
-        '''
-        # Get any function arguments that
-        # have default values
-        default_dict = {}
-        for name, val in zip(reversed(all_arguments), reversed(all_defaults)):
-            default_dict[name] = val
-        '''
+
         # Add the child nodes as children to this node
-        for child, node in child_map.iteritems():
-            self._children[child] = node
+
+        # I 'children' is a dict
+        if isinstance(children, dict):
+            for arg, child in children.iteritems():
+                self._children[arg] = child
+
+        # Else, assume it is a list
+        else:
+            if len(all_arguments) != len(children):
+                print "Error: Not all function arguments are mapped to nodes:"
+                print "Arguments: ", all_arguments, " Child Nodes: ", children
+                raise Exception("Children")
+            for arg, child in zip(all_arguments, children):
+                self._children[arg] = child
+
         # Check if there are any undefined nodes for the function
         for arg in all_arguments:
             if arg not in self._children:
@@ -124,4 +133,100 @@ class node(object):
         print " in node: ", self.name
         raise Exception()
 
-            
+
+    def __add__(self, other):
+        """ Return the sum of two nodes
+
+        """
+        name = self.name + "_plus_" + other.name
+        return sum_node(name, self, other)
+
+
+    def __mul__(self, other):
+        """ Return the product of two nodes
+
+        """
+        name = self.name + "_times_" + other.name
+        return product_node(name, self, other)
+
+
+    def __sub__(self, other):
+        """ Return the difference of two nodes
+
+        """
+        name = self.name + "_minus_" + other.name
+        return diff_node(name, self, other)
+
+
+class sum_node(node):
+    """ A node representing the sum of two nodes
+
+    """
+
+    def __init__(self, name, nodeA, nodeB):
+        """ Create a new sum node
+
+        The children are the two supplied nodes,
+        and the function is a simple sum of the
+        called values of the children nodes.
+        """
+
+        def node_sum(a, b):
+            return a + b
+        node.__init__(self, name, node_sum, [nodeA, nodeB])
+
+
+class product_node(node):
+    """ A node representing the sum of two nodes
+
+    """
+
+    def __init__(self, name, nodeA, nodeB):
+        """ Create a new product node
+
+        The children are the two supplied nodes,
+        and the function is a simple sum of the
+        called values of the children nodes.
+        """
+
+        def node_product(a, b):
+            return a * b
+        node.__init__(self, name, node_product, [nodeA, nodeB])
+
+
+class diff_node(node):
+    """ A node representing the difference of two nodes
+
+    """
+
+    def __init__(self, name, nodeA, nodeB):
+        """ Create a new sum node
+
+        The children are the two supplied nodes,
+        and the function is a simple sum of the
+        called values of the children nodes.
+        """
+
+        def node_diff(a, b):
+            return a - b
+        node.__init__(self, name, node_diff, [nodeA, nodeB])
+
+
+class quotient_node(node):
+    """ A node representing the quotient of two nodes
+
+    """
+
+    def __init__(self, name, nodeA, nodeB):
+        """ Create a new quotient node
+
+        The children are the two supplied nodes,
+        and the function is a simple sum of the
+        called values of the children nodes.
+        """
+
+        def node_quotient(a, b):
+            return a / b
+        node.__init__(self, name, node_quotient, [nodeA, nodeB])
+
+

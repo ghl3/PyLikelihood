@@ -17,6 +17,16 @@ class variable(object):
     def getVal(self):
         return self.val
 
+    def __call__(self):
+        return self.val
+
+    def __add__(self, other):
+        """ Return the sum of two variables as a node
+
+        """
+        name = self.name + "_plus_" + other.name
+        return sum_node(name, self, other)
+
     '''
     @property
     def val(self):
