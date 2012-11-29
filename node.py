@@ -92,17 +92,13 @@ class node(object):
 
     def _evaluate(self):
         kwargs = {}
-        print "Getting Value of Node: ",
         for name, node in self._children.iteritems():
-            print name, node.getVal(),
             kwargs[name] = node.getVal()
-        print ''
         return self._func(**kwargs)
 
 
     def getVal(self):
         if not self._requires_update():
-            print "Using cached val for %s:" % self.name, self._cached_val
             return self._cached_val
         value = self._evaluate()
         # cache the value
@@ -136,7 +132,6 @@ class node(object):
         for name, child in self._children.iteritems():
             if child.__class__.__name__ == 'variable': 
                 if abs(child.val - self._var_values[child.name]) > self._tolerence:
-                    print "Requires update since var: %s changed" % name
                     self._dirty=True
                     return True
             else:
@@ -184,8 +179,8 @@ class node(object):
             return integral
 
         elif len(vars_to_integrate)==2:
-            var0 = self.var(vars_to_integrate[0])
-            var1 = self.var(vars_to_integrate[1])
+            var0 = vars_to_integrate[0]
+            var1 = vars_to_integrate[1]
             def func_for_int(var1_val, var0_val):
                 var0.val = var0_val
                 var1.val = var1_val

@@ -29,11 +29,37 @@ class TestIntegral(unittest.TestCase):
         inv_mass = node("inv_mass", invariant_mass, {"a": mass0, "b":mass1})
 
         self.vars = (x0, mu0, sigma0, x1, mu1, sigma1)
-        self.node = inv_mass
+        self.nodes = (inv_mass, mass0, mass1)
 
 
     def test_1d_int(self):
         
         (x0, mu0, sigma0, x1, mu1, sigma1) = self.vars
-        self.node.integral(x0)
+        (inv_mass, mass0, mass1) = self.nodes
+
+        mu0.val = 0.0
+        mu0.sigma = 1.0
+        integral = mass0.integral(x0)
+        self.assertAlmostEqual(integral, 1.0, 4)
+        print "Integral over x0: ", integral
+
         
+    def test_2d_int(self):
+        
+        (x0, mu0, sigma0, x1, mu1, sigma1) = self.vars
+        (inv_mass, mass0, mass1) = self.nodes
+
+        mu0.val = 0.0
+        mu0.sigma = 1.0
+        mu1.val = 0.0
+        mu1.sigma = 1.0
+
+        prod = mass0*mass1
+
+
+        #integral = inv_mass.integral(x0, x1)
+        integral = prod.integral(x0, x1)
+        self.assertAlmostEqual(integral, 1.0, 1)
+        print "Integral over x0 and x1: ", integral
+
+
