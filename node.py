@@ -34,6 +34,29 @@ class variable(object):
         name = self.name + "_plus_" + other.name
         return sum_node(name, self, other)
 
+    def __sub__(self, other):
+        """ Return the sum of two variables as a node
+
+        """
+        name = self.name + "_minus_" + other.name
+        return diff_node(name, self, other)
+
+    def __mul__(self, other):
+        """ Return the product of two variables as a node
+
+        """
+        name = self.name + "_times_" + other.name
+        return product_node(name, self, other)
+
+    def __div__(self, other):
+        """ Return the quotient of two variables as a node
+
+        """
+        name = self.name + "_minus_" + other.name
+        return quotient_node(name, self, other)
+
+
+
     def linspace(self):
         return np.linspace(self.min, self.max, self.num_points)
 
@@ -268,7 +291,6 @@ class node(object):
         name = self.name + "_plus_" + other.name
         return sum_node(name, self, other)
 
-
     def __mul__(self, other):
         """ Return the product of two nodes
 
@@ -276,13 +298,19 @@ class node(object):
         name = self.name + "_times_" + other.name
         return product_node(name, self, other)
 
-
     def __sub__(self, other):
         """ Return the difference of two nodes
 
         """
         name = self.name + "_minus_" + other.name
         return diff_node(name, self, other)
+
+    def __div__(self, other):
+        """ Return the quotient of two nodes
+
+        """
+        name = self.name + "_minus_" + other.name
+        return quotient_node(name, self, other)
 
 
 def separate_vars(vars_for_int, nodeA, nodeB):

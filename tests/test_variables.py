@@ -33,3 +33,10 @@ class TestVariables(unittest.TestCase):
         with self.assertRaises(Exception):
             (x0, mu0, sigma0) = make_variables("x0[.2,-5,5], mu0[0,-5,5], sigma0[1,0,3")
 
+
+
+    def test_sum_vars(self):
+        (a, b, c) = make_variables("a[1] b[2] c[3]")
+
+        a_plus_b = a+b
+        a_plus_b = a+b

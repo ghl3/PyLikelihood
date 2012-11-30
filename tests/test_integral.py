@@ -79,3 +79,31 @@ class TestIntegral(unittest.TestCase):
         self.assertAlmostEqual(integral, 1.0, 1)
 
 
+
+    def test_sum_int(self):
+        
+        (x0, mu0, sigma0, x1, mu1, sigma1) = self.vars
+        (inv_mass, mass0, mass1) = self.nodes
+
+        total_mass = mass0 + mass1
+
+        desired_val = mass1()
+        int0 = total_mass.integral(x0)
+        int_mass0 = mass0.integral(x0)
+        val_mass1 = mass1()
+        print "Desired Val: %s int: %s mass0 int: %s mass1 val: %s" % (desired_val, int0, int_mass0, val_mass1) 
+        self.assertAlmostEqual(int0, desired_val, 3)
+
+        desired_val = mass0()
+        int1 = total_mass.integral(x1)
+        int_mass1 = mass1.integral(x1)
+        val_mass0 = mass0()
+        print "Desired Val: %s int: %s mass1 int: %s mass0 val: %s" % (desired_val, int1, int_mass1, val_mass0) 
+        self.assertAlmostEqual(int1, desired_val, 3)
+
+        int1 = total_mass.integral(x1)*mass0()
+        integral = total_mass.integral(x0, x1)
+        print "int0: %s, int1: %s, total: %s" % (int0, int1, integral)
+        self.assertAlmostEqual(integral, 1.0, 1)
+
+
