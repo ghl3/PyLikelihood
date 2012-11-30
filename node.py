@@ -4,6 +4,7 @@ from __future__ import division
 
 import inspect
 
+import re
 import scipy
 import numpy as np
 
@@ -394,7 +395,34 @@ def make_variables(var_string):
     from a comma separated list of strings
     """
 
+    # Use a regex 
+    # look for: 
+
     var_list = []
+
+    variables = re.findall(r'(\w+)(\[.*?\])?\s?', var_string)
+    for (var, args) in variables:
+        #args = re.findall(r'[-]?(\d.)[,]?[\s]?', args)
+        #args = re.findall(r'[-]?(\d.)', args)
+        #args = re.findall(r'([-]?\d+[.]\d.)', args)
+        #args = re.findall(r'([-]?\d+[.]?\d*)', args)
+
+        args = re.findall(r'([.]?[-\d]+[.]?\d*)', args)
+        args = map(float, args)
+        print "Args: ", args
+        if len(args) not in [0,1,3]:
+            print "Error: bad arguments for variable %s" % var, args
+        var = variable(var, *args)
+        var_list.append(var)
+    
+    return tuple(var_list)
+
+'''
+    var = variable(var_name, var_args[0], var_args[1], var_args[2])
+
+
+
+
 
     # "x0[.2,-5,5], mu0[0,-5,5], sigma0[1,0,3], fish"
 
@@ -443,3 +471,4 @@ def make_variables(var_string):
     return tuple(var_list)
         
 
+'''
