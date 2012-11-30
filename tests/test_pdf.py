@@ -16,7 +16,7 @@ class TestPdf(unittest.TestCase):
     def test_vals(self):
         
         # Test a gaussian pdf
-        (x, mu, sigma) = make_variables("x[.2,-5,5], mu[0,-5,5], sigma[1,0,3")
+        (x, mu, sigma) = make_variables("x[.2,-5,5], mu[0,-5,5], sigma[1,0,3]")
         mass = node("mass", gauss, {'x':x, 'mu':mu, 'sigma':sigma})
         my_pdf = pdf(mass, data=['x'])
         
@@ -40,7 +40,7 @@ class TestPdf(unittest.TestCase):
     def test_pdf(self):
 
         # Make a simple pdf for integration and normalization testing
-        (x0, mu0, sigma0) = make_variables("x0[.2,-5,5], mu0[0,-5,5], sigma0[1,0,3")
+        (x0, mu0, sigma0) = make_variables("x0[.2,-5,5], mu0[0,-5,5], sigma0[1,0,3]")
         mass0 = node("mass0", gauss, {'x':x0, 'mu':mu0, 'sigma':sigma0})
         my_pdf = pdf(mass0, data=['x0'])
 

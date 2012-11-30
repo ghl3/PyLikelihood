@@ -12,25 +12,21 @@ import unittest
 def pois(k, lam):
     return lam**k*exp(-1*lam)/factorial(k)
 
+def gauss(x, mu, sigma):
+    return norm.pdf(x, mu, sigma)
+
 
 class TestExample1(unittest.TestCase):
     
     
     def test_example(self):
         (d, s, b) = make_variables("d[1, 0, 15], s[1,0,15], b[1, 0, 15]")
-        chan = node("chan", pois, [d, N_exp])
+        chan = node("chan", pois, [d, s+b])
         
-        (x0, mu0, sigma0) = make_variables("x0[.2,-5,5], mu0[0,-5,5], sigma0[1,0,3]")
-        mass0 = node("mass0", gauss, {'x':x0, 'mu':mu0, 'sigma':sigma0})
+        (b0, sigma_b) = make_variables("b0[5,0,10], sigma_b[1,0,3]")
+        b_constraint = node("b_constraint", gauss, [b0, b, sigma_b])
         
-        (x1, mu1, sigma1) = make_variables("x1[1.2,-5,5], mu1[1,-5,5], sigma1[2,0,3]")
-        mass1 = node("mass1", gauss, {'x':x1, 'mu':mu1, 'sigma':sigma1})
+        model = chan*b_constraint
         
-        print "x0 val: ", x0.val, " x1 val: ", x1.val
-        
-        print "mass0: ", mass0.getVal()
-        print "mass1: ", mass1.getVal()
-        
-        inv_mass = node("inv_mass", invariant_mass, {"a": mass0, "b":mass1})
-        
-        return inv_mass
+        print "model val: ", model()
+

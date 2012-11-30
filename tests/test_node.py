@@ -18,10 +18,10 @@ def invariant_mass(a, b):
 
 def make_node():
     
-    (x0, mu0, sigma0) = make_variables("x0[.2,-5,5], mu0[0,-5,5], sigma0[1,0,3")
+    (x0, mu0, sigma0) = make_variables("x0[.2,-5,5], mu0[0,-5,5], sigma0[1,0,3]")
     mass0 = node("mass0", gauss, {'x':x0, 'mu':mu0, 'sigma':sigma0})
     
-    (x1, mu1, sigma1) = make_variables("x1[1.2,-5,5], mu1[1,-5,5], sigma1[2,0,3")
+    (x1, mu1, sigma1) = make_variables("x1[1.2,-5,5], mu1[1,-5,5], sigma1[2,0,3]")
     mass1 = node("mass1", gauss, {'x':x1, 'mu':mu1, 'sigma':sigma1})
     
     print "x0 val: ", x0.val, " x1 val: ", x1.val

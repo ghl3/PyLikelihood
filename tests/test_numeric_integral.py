@@ -20,10 +20,10 @@ class TestIntegral(unittest.TestCase):
     
     def setUp(self):
 
-        (x0, mu0, sigma0) = make_variables("x0[.2,-6,6], mu0[0,-5,5], sigma0[1,0,3")
+        (x0, mu0, sigma0) = make_variables("x0[.2,-6,6], mu0[0,-5,5], sigma0[1,0,3]")
         mass0 = node("mass0", gauss, {'x':x0, 'mu':mu0, 'sigma':sigma0})
     
-        (x1, mu1, sigma1) = make_variables("x1[1.2,-6,6], mu1[1,-5,5], sigma1[2,0,3")
+        (x1, mu1, sigma1) = make_variables("x1[1.2,-6,6], mu1[1,-5,5], sigma1[2,0,3]")
         mass1 = node("mass1", gauss, {'x':x1, 'mu':mu1, 'sigma':sigma1})
     
         inv_mass = node("inv_mass", invariant_mass, {"a": mass0, "b":mass1})

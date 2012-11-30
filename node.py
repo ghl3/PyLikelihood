@@ -410,9 +410,13 @@ def make_variables(var_string):
         args = re.findall(r'([.]?[-\d]+[.]?\d*)', args)
         args = map(float, args)
         print "Args: ", args
-        if len(args) not in [0,1,3]:
+        if len(args) not in [0,1,2,3]:
             print "Error: bad arguments for variable %s" % var, args
-        var = variable(var, *args)
+        if len(args)==2:
+            # Use the lower bound as the initial value
+            var = variable(var, args[0], args[0], args[1])
+        else:
+            var = variable(var, *args)
         var_list.append(var)
     
     return tuple(var_list)
