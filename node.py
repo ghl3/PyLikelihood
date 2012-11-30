@@ -285,6 +285,38 @@ class node(object):
         return diff_node(name, self, other)
 
 
+def separate_vars(vars_for_int, nodeA, nodeB):
+    """ Determine common vars across nodes
+
+    Given a set of variables to integrate and
+    two nodes, determine which vars are shared, 
+    which vars are shared, which are individual,
+    and which are for neither
+    """
+
+    dep_vars0 = self.children[0].dependent_vars()
+    dep_vars1 = self.children[1].dependent_vars()
+    
+    vars_for_0_only = [var for var in vars_to_integrate
+                                if var in dep_vars0 
+                                and var not in dep_vars1]
+    
+    vars_for_1_only = [var for var in vars_to_integrate
+                                if var in dep_vars1 
+                                and var not in dep_vars0]
+    
+    vars_for_both = [var for var in vars_to_integrate
+                     if var in dep_vars0
+                     and var in dep_vars1]
+
+    vars_for_none = [var for var in vars_to_integrate
+                     if var not in dep_vars0
+                     and var not in dep_vars1]
+
+
+    return (vars_for_both, vars_for_0_only, vars_for_1_only, vars_for_none)
+
+
 class sum_node(node):
     """ A node representing the sum of two nodes
 
@@ -301,6 +333,30 @@ class sum_node(node):
         def node_sum(a, b):
             return a + b
         node.__init__(self, name, node_sum, [nodeA, nodeB])
+
+
+
+        def integral(self, *vars_to_integrate):
+            """ Return a smart integrate of a product
+
+            There are two cases:
+              - If the variables are 
+
+            """
+
+            (vars_both, vars_0_only, 
+             vars_1_only, vars_none) = separate_vars(vars_to_integrate, 
+                                                     self.children[0],
+                                                     self.children[1])
+                 
+            if len(vars_both) != 0:
+                return self._numeric_integral(vars_to_integrate)
+
+            else:
+                int0 = children[0].integrate(*vars_to_integrate_0_only)
+                int1 = children[1].integrate(*vars_to_integrate_1_oly)
+                int_other = self._numeric_integral(vars_none)
+                return (int0 + int1)*int_other
 
 
 class product_node(node):
@@ -329,6 +385,11 @@ class product_node(node):
 
             """
 
+            (vars_both, vars_0_only, 
+             vars_1_only, vars_none) = separate_vars(vars_to_integrate, 
+                                                     self.children[0],
+                                                     self.children[1])
+            '''
             dep_vars0 = self.children[0].dependent_vars()
             dep_vars1 = self.children[1].dependent_vars()
             
@@ -343,14 +404,16 @@ class product_node(node):
             vars_for_both = [var for var in vars_to_integrate
                              if var in dep_vars0
                              and var in dep_vars1]
-
-            if len(vars_for_both) != 0:
+            '''
+                 
+            if len(vars_both) != 0:
                 return self._numeric_integral(vars_to_integrate)
 
             else:
                 int0 = children[0].integrate(*vars_to_integrate_0_only)
                 int1 = children[1].integrate(*vars_to_integrate_1_oly)
-                return int0*int1
+                int_other = self._numeric_integral(vars_none)
+                return int0*int1*int_other
 
 
 class diff_node(node):
@@ -420,59 +483,3 @@ def make_variables(var_string):
         var_list.append(var)
     
     return tuple(var_list)
-
-'''
-    var = variable(var_name, var_args[0], var_args[1], var_args[2])
-
-
-
-
-
-    # "x0[.2,-5,5], mu0[0,-5,5], sigma0[1,0,3], fish"
-
-    # Get any variables with ranges defined
-    remaining = []
-    for var_str in var_string.split('],'):
-        if '[' not in var_str and ']' not in var_str:
-            remaining.append(var_str)
-            print "Appending to remaining: ", var_str
-            continue
-        var_str = (var_str + ']').strip()
-        print "Making ranged variable: ", var_str
-        if '[' not in var_str or ']' not in var_str:
-            print "Improper variable defined: ", var_str
-            raise Exception()
-        arg_begin = var_str.find('[')
-        arg_end = var_str.find(']')
-        if arg_end < arg_begin:
-            print "Error, invaid variable string: ", var_str
-            raise Exception()
-        var_name = var_str[:arg_begin]
-        var_args = var_str[arg_begin + 1 : arg_end]
-        var_args = var_args.split(',')
-        var_args = [ float(arg) for arg in var_args]
-        print "Variable args: ", var_args
-        if len(var_args)==0:
-            print "Error: Improper variable args"
-            raise Exception()
-        elif len(var_args)==1:
-            var = variable(var_name, var_args[0])
-        elif len(var_args)==2:
-            print "Error: Improper variable args"
-            raise Exception()
-        elif len(var_args)==3:
-            var = variable(var_name, var_args[0], var_args[1], var_args[2])
-        else:
-            print "Error: Improper variable args"
-            raise Exception()
-        var_list.append(var)
-
-    for var_str in remaining:
-        var_str = var_str.strip()
-        var = variable(var_str)
-        var_list.append(var)
-
-    return tuple(var_list)
-        
-
-'''
