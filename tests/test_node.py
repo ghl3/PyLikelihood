@@ -36,7 +36,6 @@ def make_node():
 
 class TestNode(unittest.TestCase):
 
-
     def test_create_vars(self):
         for var in make_variables("x0[.2,-5,5], mu0[0,-5,5], sigma0[1,0,3], fish"):
             print var, var.name, var.val, var.min, var.max

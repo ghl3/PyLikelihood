@@ -1,5 +1,4 @@
 
-# cause, duh:
 from __future__ import division
 
 import inspect
@@ -55,10 +54,15 @@ class variable(object):
         name = self.name + "_minus_" + other.name
         return quotient_node(name, self, other)
 
-
-
     def linspace(self):
         return np.linspace(self.min, self.max, self.num_points)
+
+
+class CannotAnalyticallyIntegrate(Exception):
+    """ Custom Exception for when analytical integration is not possible
+
+    """
+    pass
 
 
 class node(object):
@@ -75,7 +79,9 @@ class node(object):
         self.name = name
         self._func = func
 
-        # graph properties
+        # Mapping between function arguments
+        # and child nodes
+        # ie children['x'] = mass, etc
         self._children = {}
         
         # caching properties
@@ -267,7 +273,6 @@ class node(object):
                                                     lower_bound_2, upper_bound_2)
             return integral
 
-        
         else: 
             print "Error: Cannot yet integrate over >2 dimensions"
             print "Attempting to integrate over: "
@@ -275,11 +280,21 @@ class node(object):
             raise Exception("IntegralDimension")
 
 
+    def _analytical_integral(self, vars_to_integrate):
+        raise CannotAnalyticallyIntegrate
+        
+
     def integral(self, *vars_to_integrate):
         """ A smart integral that attempts to divide and conquor
 
         This integration method 
         """
+
+        try:
+            analytic_integral = self._analytical_integral(vars_to_integrate)
+            return analytical_integral
+        except CannotAnalyticallyIntegrate:
+            pass
 
         return self._numeric_integral(vars_to_integrate)
 
